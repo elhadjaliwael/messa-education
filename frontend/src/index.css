@@ -1,0 +1,84 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
+@import "tailwindcss";
+@theme{
+  --font-primary : 'Poppins';
+  --color-primary : #2563eb;
+  --color-primary-content : #ffffff;
+  --color-primary-light : #5484ef;
+  --color-primary-dark : #134cca;
+  --color-background : #eaeef5;
+  --color-foreground : #fafbfd;
+  --color-border : #d4dbea;
+  --color-copy : #192134;
+  --color-copy-light : #42598a;
+  --color-copy-lighter :  #647db4;
+  --animate-float : float 3s ease-in-out infinite;
+  @keyframes float {
+    0% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-15px);
+    }
+
+    100% {
+        transform: translateY(0);
+    }
+  }
+
+}
+*{
+  @apply transition-colors duration-150
+}
+
+#root,body,html{
+  margin : 0px;
+}
+.dark{
+  --color-foreground : #192134;
+  --color-background : #111622;
+  --color-border : #293756;
+  --color-copy : #fafbfd;
+  --color-copy-light : #cbd4e6;
+  --color-copy-lighter :  #879ac5;    
+}
+body{
+  background-color: var(--color-background);
+}
+
+
+.menu-enter {
+    animation: slideDown 0.3s ease-out forwards;
+}
+
+.menu-exit {
+    animation: slideUp 0.3s ease-out forwards;
+}
+.light-icon{
+  filter: invert(10%) sepia(7%) saturate(4542%) hue-rotate(185deg) brightness(92%) contrast(91%);
+}
+.dark-icon{
+  filter: invert(100%) sepia(5%) saturate(2574%) hue-rotate(177deg) brightness(100%) contrast(98%);
+}
+@keyframes slideDown {
+    0% {
+        transform: translateY(-10px);
+        opacity: 0;
+    }
+    100% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+    0% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(-10px);
+        opacity: 0;
+    }
+}
