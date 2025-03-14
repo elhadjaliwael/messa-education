@@ -1,0 +1,6 @@
+{"services":
+{
+"fakeservice":
+{"apiName":"fakeservice","host":"http://localhost","port":3001,"url":"http://localhost:3001","routes":["/fake","/fake/:id","/test/:id"]},
+"courses" :    {"apiName":"fakeservice","host":"http://localhost","port":3001,"url":"http://localhost:3000","routes":["/course"]}
+}}  
