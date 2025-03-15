@@ -28,7 +28,7 @@ router.get("/",async (req,res) => {
         res.status(500).json({ message: "Server error: " + error.message });
     }
 })
-
+//delete
 router.delete('/:id', async (req, res) => {
     const courseId = req.params.id;
     try {
