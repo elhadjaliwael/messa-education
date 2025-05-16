@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -58,7 +58,9 @@ function AdminDashboard() {
       default: return <Activity className="h-4 w-4" />;
     }
   };
-
+  useEffect(() => {
+    // Fetch stats and recent activities from API
+  },[])
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">

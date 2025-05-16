@@ -5,16 +5,36 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ChevronLeft, ChevronRight, Plus, Trash2 } from "lucide-react";
+import useCourseStore from '@/store/courseStore';
+import toast from 'react-hot-toast';
 
-function ChaptersForm({ 
-  courseData, 
-  currentChapter, 
-  handleChapterChange, 
-  addChapter, 
-  removeChapter, 
-  prevStep, 
-  nextStep 
-}) {
+function ChaptersForm({ prevStep, nextStep }) {
+  // Get state and actions from the store
+  const courseData = useCourseStore(state => state.courseData);
+  const currentChapter = useCourseStore(state => state.currentChapter);
+  const updateCurrentChapter = useCourseStore(state => state.updateCurrentChapter);
+  const addChapter = useCourseStore(state => state.addChapter);
+  const removeChapter = useCourseStore(state => state.removeChapter);
+  
+  // Handle chapter changes
+  const handleChapterChange = (e) => {
+    const { name, value } = e.target;
+    updateCurrentChapter({
+      [name]: value
+    });
+  };
+  
+  // Add chapter validation wrapper
+  const handleAddChapter = () => {
+    if (!currentChapter.title) {
+      toast.error("Chapter title is required");
+      return;
+    }
+    
+    addChapter();
+    toast.success("Chapter added successfully");
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -59,7 +79,7 @@ function ChaptersForm({
             />
           </div>
           
-          <Button type="button" onClick={addChapter} className="w-full">
+          <Button type="button" onClick={handleAddChapter} className="w-full">
             <Plus className="mr-2 h-4 w-4" />
             Add Chapter
           </Button>

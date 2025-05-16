@@ -41,6 +41,7 @@ import {
 import { Check, ChevronsUpDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { classes } from '@/data/tunisian-education';
 function AdminUsersPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newTeacher, setNewTeacher] = useState({
@@ -142,17 +143,7 @@ function AdminUsersPage() {
   };
 
   // Add available classes for selection
-  const availableClasses = [
-    { id: "4th-grade", label: "4th Grade" },
-    { id: "5th-grade", label: "5th Grade" },
-    { id: "6th-grade", label: "6th Grade" },
-    { id: "7th-grade", label: "7th Grade" },
-    { id: "8th-grade", label: "8th Grade" },
-    { id: "9th-grade", label: "9th Grade" },
-    { id: "10th-grade", label: "10th Grade" },
-    { id: "11th-grade", label: "11th Grade" },
-    { id: "12th-grade", label: "12th Grade" },
-  ];
+  const availableClasses = Object.keys(classes);
 
   // Replace the handleClassToggle function with this
   const handleClassSelect = (className) => {

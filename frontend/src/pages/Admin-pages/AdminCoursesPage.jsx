@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Card,
   CardContent,
@@ -23,48 +23,118 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Plus, Edit, Trash2, FileText, Eye, Download, CheckCircle } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, FileText, Eye, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from 'react-router';
+import { axiosPrivate } from '@/api/axios';
 
 function AdminCoursesPage() {
-  // Mock chapters data
-  const navigate = useNavigate()
-  const [chapters, setChapters] = useState([
-    { id: 1, title: 'Numbers and Operations', subject: 'Mathematics', grade: '5th Grade', order: 1, lessons: 5, status: 'Published', lastUpdated: '2023-05-15' },
-    { id: 2, title: 'Fractions', subject: 'Mathematics', grade: '5th Grade', order: 2, lessons: 4, status: 'Published', lastUpdated: '2023-05-20' },
-    { id: 3, title: 'Geometry Basics', subject: 'Mathematics', grade: '5th Grade', order: 3, lessons: 6, status: 'Draft', lastUpdated: '2023-06-01' },
-    { id: 4, title: 'Measurements', subject: 'Mathematics', grade: '5th Grade', order: 4, lessons: 3, status: 'Published', lastUpdated: '2023-06-10' },
-    { id: 5, title: 'Mechanics', subject: 'Physics', grade: '10th Grade', order: 1, lessons: 7, status: 'Published', lastUpdated: '2023-04-22' },
-    { id: 6, title: 'Electricity', subject: 'Physics', grade: '10th Grade', order: 2, lessons: 5, status: 'Published', lastUpdated: '2023-05-05' },
-    { id: 7, title: 'Optics', subject: 'Physics', grade: '10th Grade', order: 3, lessons: 4, status: 'Draft', lastUpdated: '2023-06-15' },
-    { id: 8, title: 'Organic Chemistry', subject: 'Chemistry', grade: '11th Grade', order: 1, lessons: 6, status: 'Published', lastUpdated: '2023-03-10' },
-    { id: 9, title: 'Periodic Table', subject: 'Chemistry', grade: '11th Grade', order: 2, lessons: 3, status: 'Published', lastUpdated: '2023-04-05' },
-    { id: 10, title: 'Cell Biology', subject: 'Biology', grade: '12th Grade', order: 1, lessons: 5, status: 'Published', lastUpdated: '2023-05-12' },
-    { id: 11, title: 'Grammar', subject: 'French', grade: '6th Grade', order: 1, lessons: 8, status: 'Published', lastUpdated: '2023-04-18' },
-    { id: 12, title: 'Vocabulary', subject: 'English', grade: '8th Grade', order: 1, lessons: 6, status: 'Draft', lastUpdated: '2023-06-20' },
-  ]);
-
-  const [selectedGrade, setSelectedGrade] = useState('All');
-  const [selectedSubject, setSelectedSubject] = useState('All');
+  const navigate = useNavigate();
+  const [courses, setCourses] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-
-  // Get unique grades
-  const grades = ['All', ...new Set(chapters.map(chapter => chapter.grade))];
+  const [selectedGrade, setSelectedGrade] = useState('All');
+  const [selectedSubject, setSelectedSubject] = useState('All');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   
-  // Get unique subjects
-  const subjects = ['All', ...new Set(chapters.map(chapter => chapter.subject))];
+  console.log(courses)
 
-  // Filter chapters based on selected grade, subject, search term, and status
-  const filteredChapters = chapters.filter(chapter => {
-    const matchesGrade = selectedGrade === 'All' || chapter.grade === selectedGrade;
-    const matchesSubject = selectedSubject === 'All' || chapter.subject === selectedSubject;
-    const matchesSearch = chapter.title.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'All' || chapter.status === statusFilter;
-    return matchesGrade && matchesSubject && matchesSearch && matchesStatus;
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
+
+  // Define available grades and subjects
+  const grades = ['All', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade'];
+  const subjects = ['All', 'Mathematics', 'Science', 'English', 'History', 'Geography', 'Computer Science'];
+  const itemsPerPageOptions = [5, 10, 20, 50];
+
+  useEffect(() => {
+    fetchCourses();
+  }, [currentPage, itemsPerPage]);
+
+  const fetchCourses = async () => {
+    try {
+      setLoading(true);
+      // Updated API endpoint to match the new routes structure
+      const response = await axiosPrivate.get(`/courses?page=${currentPage}&limit=${itemsPerPage}`);
+      
+      // Check if the response has pagination structure
+      if (response.data.chapters && response.data.pagination) {
+        // Transform the API response to match our table structure
+        const formattedCourses = response.data.chapters.map((chapter, index) => ({
+          id: chapter._id,
+          title: chapter.title,
+          subject: chapter.subject,
+          grade: chapter.classLevel,
+          order: ((currentPage - 1) * itemsPerPage) + index + 1,
+          lessons: chapter.lessonsCount || 0,
+          exercices: chapter.exercisesCount || 0,
+          quizzes: chapter.quizzesCount || 0,
+          totalTime: chapter.totalTime || 0,
+          status: chapter.isPublished ? 'Published' : 'Draft',
+          lastUpdated: new Date(chapter.updatedAt).toLocaleDateString(),
+        }));
+        
+        setCourses(formattedCourses);
+        setTotalPages(response.data.pagination.totalPages);
+        setTotalItems(response.data.pagination.total);
+      } else {
+        // If the API doesn't return the expected structure, handle it gracefully
+        console.warn('API response format has changed, using fallback parsing');
+        
+        // Simple fallback that works with any array response
+        const formattedCourses = Array.isArray(response.data) ? response.data.map((chapter, index) => ({
+          id: chapter._id,
+          title: chapter.title || chapter.subject,
+          subject: chapter.subject,
+          grade: chapter.classLevel,
+          order: index + 1,
+          lessons: chapter.lessonsCount || 0,
+          exercices: chapter.exercisesCount || 0,
+          quizzes: chapter.quizzesCount || 0,
+          totalTime: chapter.totalTime || 0,
+          status: chapter.isPublished ? 'Published' : 'Draft',
+          lastUpdated: new Date(chapter.updatedAt).toLocaleDateString(),
+        })) : [];
+        setCourses(formattedCourses);
+        setTotalItems(formattedCourses.length);
+        setTotalPages(Math.ceil(formattedCourses.length / itemsPerPage));
+      }
+    } catch (error) {
+      console.error('Error fetching chapters:', error);
+      setError('Failed to load chapters. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Filter courses based on search term, status, grade, and subject
+  const filteredCourses = courses.filter(course => {
+    const matchesSearch = course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          course.subject.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'All' || course.status === statusFilter;
+    const matchesGrade = selectedGrade === 'All' || course.grade === selectedGrade;
+    const matchesSubject = selectedSubject === 'All' || course.subject === selectedSubject;
+    
+    return matchesSearch && matchesStatus && matchesGrade && matchesSubject;
   });
+
+  
+
+  const handlePageChange = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
+  const handleItemsPerPageChange = (value) => {
+    setItemsPerPage(parseInt(value));
+    setCurrentPage(1); // Reset to first page when changing items per page
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -72,14 +142,14 @@ function AdminCoursesPage() {
         <h1 className="text-3xl font-bold tracking-tight">Curriculum Management</h1>
         <Button onClick={() => navigate('/admin/courses/add')}>
           <Plus className="mr-2 h-4 w-4" />
-          Add New Chapter
+          Add New Course
         </Button>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Course Chapters</CardTitle>
-          <CardDescription>View and manage chapters by grade and subject</CardDescription>
+          <CardTitle>Course Management</CardTitle>
+          <CardDescription>View and manage courses by grade and subject</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="all" className="mb-6">
@@ -93,14 +163,35 @@ function AdminCoursesPage() {
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="search"
-                  placeholder="Search chapters..."
+                  placeholder="Search courses..."
                   className="w-[250px] pl-8"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
+              <div className="flex items-center space-x-2">
+                      <p className="text-sm text-muted-foreground">
+                        Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} entries
+                      </p>
+                      <Select 
+                        value={itemsPerPage.toString()} 
+                        onValueChange={handleItemsPerPageChange}
+                      >
+                        <SelectTrigger className="w-[80px] h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {itemsPerPageOptions.map(option => (
+                            <SelectItem key={option} value={option.toString()}>
+                              {option}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-sm text-muted-foreground">per page</p>
+                    </div>
+                    
             </div>
-
             <div className="flex items-center space-x-2 mb-4">
               <Select value={selectedGrade} onValueChange={setSelectedGrade}>
                 <SelectTrigger className="w-[180px]">
@@ -127,76 +218,133 @@ function AdminCoursesPage() {
 
             <TabsContent value="all" className="m-0">
               <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[50px]">#</TableHead>
-                      <TableHead>Chapter Title</TableHead>
-                      <TableHead>Subject</TableHead>
-                      <TableHead>Grade</TableHead>
-                      <TableHead className="text-center">Order</TableHead>
-                      <TableHead className="text-center">Lessons</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Last Updated</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredChapters.length > 0 ? (
-                      filteredChapters.map((chapter) => (
-                        <TableRow key={chapter.id}>
-                          <TableCell className="font-medium">{chapter.id}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center">
-                              <FileText className="mr-2 h-4 w-4 text-muted-foreground" />
-                              {chapter.title}
-                            </div>
-                          </TableCell>
-                          <TableCell>{chapter.subject}</TableCell>
-                          <TableCell>{chapter.grade}</TableCell>
-                          <TableCell className="text-center">{chapter.order}</TableCell>
-                          <TableCell className="text-center">{chapter.lessons}</TableCell>
-                          <TableCell>
-                            <Badge variant={chapter.status === 'Published' ? 'default' : 'secondary'}>
-                              {chapter.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{chapter.lastUpdated}</TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end space-x-2">
-                              <Button variant="ghost" size="icon" title="View">
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon" title="Edit">
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              {chapter.status === 'Draft' ? (
-                                <Button variant="ghost" size="icon" title="Publish">
-                                  <CheckCircle className="h-4 w-4" />
+                {loading ? (
+                  <div className="h-24 flex items-center justify-center">
+                    <p>Loading courses...</p>
+                  </div>
+                ) : error ? (
+                  <div className="h-24 flex items-center justify-center text-red-500">
+                    <p>{error}</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[50px]">#</TableHead>
+                        <TableHead>Subject</TableHead>
+                        <TableHead>Grade</TableHead>
+                        <TableHead className="text-center">Lessons</TableHead>
+                        <TableHead className="text-center">Exercises</TableHead>
+                        <TableHead className="text-center">Quizzes</TableHead>
+                        <TableHead className="text-center">Total Time</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Last Updated</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredCourses.length > 0 ? (
+                        filteredCourses.map((course, index) => (
+                          <TableRow 
+                            key={course.id}
+                            className="hover:bg-muted/50 cursor-pointer"
+                          >
+                            <TableCell className="font-medium">{course.order}</TableCell>
+                            <TableCell className="font-medium">{course.subject}</TableCell>
+                            <TableCell>{course.grade}</TableCell>
+                            <TableCell className="text-center">{course.lessons || 0}</TableCell>
+                            <TableCell className="text-center">{course.exercices || 0}</TableCell>
+                            <TableCell className="text-center">{course.quizzes || 0}</TableCell>
+                            <TableCell className="text-center">
+                              {course.totalTime ? `${course.totalTime} min` : '0 min'}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={course.status === 'Published' ? 'default' : 'secondary'}>
+                                {course.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{course.lastUpdated}</TableCell>
+                            <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex justify-end space-x-2">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="h-8 px-2 rounded-md hover:bg-primary/10"
+                                  title="View"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate(`/admin/courses/${course.id}/view`);
+                                  }}
+                                >
+                                  <Eye className="h-4 w-4" />
                                 </Button>
-                              ) : (
-                                <Button variant="ghost" size="icon" title="Download">
-                                  <Download className="h-4 w-4" />
-                                </Button>
-                              )}
-                              <Button variant="ghost" size="icon" title="Delete">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={11} className="h-24 text-center">
+                            {searchTerm || selectedGrade !== 'All' || selectedSubject !== 'All' ? 
+                              'No courses found for the selected criteria.' : 
+                              'No courses available. Click "Add New Course" to create one.'}
                           </TableCell>
                         </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={9} className="h-24 text-center">
-                          {selectedGrade !== 'All' || selectedSubject !== 'All' ? 
-                            'No chapters found for the selected criteria.' : 
-                            'Please select a grade and subject to view chapters.'}
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
+                      )}
+                    </TableBody>
+                  </Table>
+                )}
+                
+                {/* Pagination Controls */}
+                {!loading && filteredCourses.length > 0 && (
+                  <div className="flex items-center justify-between px-4 py-4 border-t">
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        disabled={currentPage === 1}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <div className="flex items-center">
+                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                          // Show pages around current page
+                          let pageToShow;
+                          if (totalPages <= 5) {
+                            pageToShow = i + 1;
+                          } else if (currentPage <= 3) {
+                            pageToShow = i + 1;
+                          } else if (currentPage >= totalPages - 2) {
+                            pageToShow = totalPages - 4 + i;
+                          } else {
+                            pageToShow = currentPage - 2 + i;
+                          }
+                          
+                          return (
+                            <Button
+                              key={pageToShow}
+                              variant={currentPage === pageToShow ? "default" : "outline"}
+                              size="icon"
+                              className="w-8 h-8 mx-1"
+                              onClick={() => handlePageChange(pageToShow)}
+                            >
+                              {pageToShow}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </TabsContent>
             <TabsContent value="published" className="m-0">

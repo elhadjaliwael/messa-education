@@ -1,16 +1,19 @@
 import { Activity, Progress, Analytics } from '../models/analytics.js';
-import Course from '../models/course.js';
+import { Chapter, Lesson } from '../models/course.js';
+
 // Track a learning activity
 export const trackActivity = async (req, res) => {
   try {
-    const { activityType, courseId, exerciseId, quizId, resourceId, score, timeSpent, metadata } = req.body;
+    const { activityType, subject, chapterId, lessonId, exerciseId, quizId, resourceId, score, timeSpent, metadata } = req.body;
 
     const userId = req.user.id;
     // Create new activity record
     const activity = new Activity({
       userId,
       activityType,
-      courseId,
+      subject,
+      chapterId,
+      lessonId,
       exerciseId,
       quizId,
       resourceId,
@@ -20,123 +23,285 @@ export const trackActivity = async (req, res) => {
     });
 
     await activity.save();
-
+    
     // Update progress if this is a course-related activity
-    if (courseId) {
-      // Find or create progress record
-      let progress = await Progress.findOne({ userId, courseId });
+    if (subject) {
+      // Instead of find-then-save, use findOneAndUpdate with upsert
+      let progressUpdate = {
+        lastAccessedAt: new Date()
+      };
       
-      if (!progress) {
-        progress = new Progress({
-          userId,
-          courseId,
-          progress: 0,
-          completedLessons: [],
-          completedExercises: [],
-          completedQuizzes: []
-        });
-      }
-
-      // Update progress based on activity type
-      if (activityType === 'exercise_complete' && exerciseId) {
-        if (!progress.completedExercises.includes(exerciseId)) {
-          progress.completedExercises.push(exerciseId);
-        }
-      } else if (activityType === 'quiz_attempt' && quizId && score >= 70) {
-        // Consider quiz completed if score is 70% or higher
-        if (!progress.completedQuizzes.includes(quizId)) {
-          progress.completedQuizzes.push(quizId);
-        }
-      }
-
-      // Update last accessed time
-      progress.lastAccessedAt = new Date();
-      
-      // Add time spent
+      // Add time spent if provided
       if (timeSpent) {
-        progress.totalTimeSpent += timeSpent;
+        progressUpdate.$inc = { totalTimeSpent: timeSpent };
       }
-
-      // Calculate overall progress percentage
-      const course = await Course.findById(courseId);
-      if (course) {
-        const totalItems = 
-          (course.lessons?.length || 0) + 
-          (course.exercises?.length || 0) + 
-          (course.quizzes?.length || 0);
+      
+      // Update arrays based on activity type
+      if (activityType === 'exercise_complete' && exerciseId) {
+        progressUpdate.$addToSet = { completedExercises: exerciseId };
+      } else if ((activityType === 'quiz_attempt' || activityType === 'quiz_complete') && quizId && score >= 70) {
+        progressUpdate.$addToSet = { completedQuizzes: quizId };
+      } else if (activityType === 'lesson_complete' && lessonId) {
+        progressUpdate.$addToSet = { completedLessons: lessonId };
+      }
+      
+      // First update the basic progress data
+      let progress = await Progress.findOneAndUpdate(
+        { userId, subject },
+        progressUpdate,
+        { 
+          new: true, 
+          upsert: true,
+          setDefaultsOnInsert: true
+        }
+      );
+      
+      // Now calculate overall progress percentage
+      const chapter = await Chapter.findOne({ 
+        subject: { $regex: new RegExp('^' + subject + '$', 'i') } 
+      });
+      
+      if (chapter) {
+        // Get all chapters for this subject
+        const chapters = await Chapter.find({ 
+          subject: { $regex: new RegExp('^' + subject + '$', 'i') } 
+        });
+        
+        // Get all lessons for these chapters
+        const chapterIds = chapters.map(chapter => chapter._id);
+        const lessons = await Lesson.find({ chapterId: { $in: chapterIds } });
+        
+        // Count total items
+        const totalLessons = lessons.length;
+        const totalExercises = lessons.reduce((sum, lesson) => sum + (lesson.exercises?.length || 0), 0);
+        const totalQuizzes = lessons.reduce((sum, lesson) => sum + (lesson.quizzes?.length || 0), 0);
+        
+        const totalItems = totalLessons + totalExercises + totalQuizzes;
         
         const completedItems = 
           progress.completedLessons.length + 
           progress.completedExercises.length + 
           progress.completedQuizzes.length;
         
-        progress.progress = totalItems > 0 
+        const progressPercentage = totalItems > 0 
           ? Math.min(100, Math.round((completedItems / totalItems) * 100)) 
           : 0;
           
+        // Calculate progress for each chapter
+        const chapterProgressArray = [];
+        const completedChapters = [];
+        
+        for (const chapter of chapters) {
+          // Get lessons for this chapter
+          const chapterLessons = lessons.filter(lesson => 
+            lesson.chapterId.toString() === chapter._id.toString()
+          );
+          
+          // Count total items in this chapter
+          const chapterTotalLessons = chapterLessons.length;
+          const chapterTotalExercises = chapterLessons.reduce((sum, lesson) => 
+            sum + (lesson.exercises?.length || 0), 0);
+          const chapterTotalQuizzes = chapterLessons.reduce((sum, lesson) => 
+            sum + (lesson.quizzes?.length || 0), 0);
+          
+          // Count completed items in this chapter
+          const chapterCompletedLessons = chapterLessons.filter(lesson => 
+            progress.completedLessons.some(id => id.toString() === lesson._id.toString())
+          ).length;
+          
+          const chapterCompletedExercises = chapterLessons.flatMap(lesson => 
+            lesson.exercises || []
+          ).filter(exercise => 
+            progress.completedExercises.some(id => id.toString() === exercise._id.toString())
+          ).length;
+          
+          const chapterCompletedQuizzes = chapterLessons.flatMap(lesson => 
+            lesson.quizzes || []
+          ).filter(quiz => 
+            progress.completedQuizzes.some(id => id.toString() === quiz._id.toString())
+          ).length;
+          
+          // Calculate chapter progress percentage
+          const chapterTotalItems = chapterTotalLessons + chapterTotalExercises + chapterTotalQuizzes;
+          const chapterCompletedItems = chapterCompletedLessons + chapterCompletedExercises + chapterCompletedQuizzes;
+          
+          const chapterProgressPercentage = chapterTotalItems > 0 
+            ? Math.min(100, Math.round((chapterCompletedItems / chapterTotalItems) * 100)) 
+            : 0;
+          
+          // Check if all lessons, exercises, and quizzes in this chapter are completed
+          const allLessonsCompleted = chapterLessons.every(lesson => 
+            progress.completedLessons.some(id => id.toString() === lesson._id.toString())
+          );
+          
+          const allExercisesCompleted = chapterLessons.flatMap(lesson => 
+            lesson.exercises || []
+          ).every(exercise => 
+            progress.completedExercises.some(id => id.toString() === exercise._id.toString())
+          );
+          
+          const allQuizzesCompleted = chapterLessons.flatMap(lesson => 
+            lesson.quizzes || []
+          ).every(quiz => 
+            progress.completedQuizzes.some(id => id.toString() === quiz._id.toString())
+          );
+          
+          // Add chapter to completed chapters if all content is completed
+          const chapterFullyCompleted = allLessonsCompleted && allExercisesCompleted && allQuizzesCompleted;
+          if (chapterFullyCompleted && chapterLessons.length > 0) {
+            completedChapters.push(chapter._id);
+          }
+          
+          // Add chapter progress to array
+          chapterProgressArray.push({
+            chapterId: chapter._id,
+            title: chapter.title,
+            progress: chapterProgressPercentage,
+            totalLessons: chapterTotalLessons,
+            completedLessons: chapterCompletedLessons,
+            totalExercises: chapterTotalExercises,
+            completedExercises: chapterCompletedExercises,
+            totalQuizzes: chapterTotalQuizzes,
+            completedQuizzes: chapterCompletedQuizzes,
+            completed: chapterProgressPercentage === 100
+          });
+        }
+        
+        // Use findOneAndUpdate again to update the calculated progress data
+        // This avoids version conflicts
+        progress = await Progress.findOneAndUpdate(
+          { userId, subject },
+          { 
+            progress: progressPercentage,
+            chapterProgress: chapterProgressArray,
+            completedChapters: completedChapters
+          },
+          { new: true }
+        );
+        
         // Check if course is completed
-        if (progress.progress === 100 && !progress.certificateIssued) {
-          progress.certificateIssued = true;
-          progress.certificateIssuedAt = new Date();
+        if (progressPercentage === 100 && !progress.certificateIssued) {
+          await Progress.findOneAndUpdate(
+            { userId, subject },
+            { 
+              certificateIssued: true,
+              certificateIssuedAt: new Date()
+            }
+          );
+          
+          // Track certificate earned activity
+          const certificateActivity = new Activity({
+            userId,
+            activityType: 'certificate_earned',
+            subject,
+            metadata: {
+              progress: 100,
+              completedAt: new Date()
+            }
+          });
+          await certificateActivity.save();
         }
       }
-
-      await progress.save();
     }
 
     // Update daily analytics
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    let dailyAnalytics = await Analytics.findOne({ date: today });
+    // Use findOneAndUpdate for analytics too
+    let analyticsUpdate = {};
     
-    if (!dailyAnalytics) {
-      dailyAnalytics = new Analytics({
-        date: today,
-        dailyActiveUsers: 0,
-        totalCoursesViewed: 0,
-        totalExercisesCompleted: 0,
-        totalQuizzesAttempted: 0,
-        averageScore: 0,
-        courseEngagement: []
-      });
+    // Set up the update based on activity type
+    if (activityType === 'course_view' && subject) {
+      analyticsUpdate.$inc = { totalCoursesViewed: 1 };
+    } else if (activityType === 'chapter_view' && chapterId) {
+      analyticsUpdate.$inc = { totalChaptersViewed: 1 };
+    } else if (activityType === 'lesson_view' && lessonId) {
+      analyticsUpdate.$inc = { totalLessonsViewed: 1 };
+    } else if (activityType === 'lesson_complete' && lessonId) {
+      analyticsUpdate.$inc = { totalLessonsCompleted: 1 };
+    } else if (activityType === 'exercise_complete') {
+      analyticsUpdate.$inc = { totalExercisesCompleted: 1 };
+    } else if (activityType === 'quiz_attempt') {
+      analyticsUpdate.$inc = { totalQuizzesAttempted: 1 };
+    } else if (activityType === 'quiz_complete') {
+      analyticsUpdate.$inc = { totalQuizzesCompleted: 1 };
     }
-
-    // Update metrics based on activity type
-    if (activityType === 'course_view' && courseId) {
-      dailyAnalytics.totalCoursesViewed += 1;
+    
+    // Create or update analytics
+    await Analytics.findOneAndUpdate(
+      { date: today },
+      analyticsUpdate,
+      { 
+        upsert: true,
+        setDefaultsOnInsert: true
+      }
+    );
+    
+    // Handle subject engagement separately if needed
+    if (activityType === 'course_view' && subject) {
+      const analytics = await Analytics.findOne({ date: today });
       
-      // Update course engagement
-      const courseIndex = dailyAnalytics.courseEngagement.findIndex(
-        item => item.courseId.toString() === courseId.toString()
+      const subjectIndex = analytics.subjectEngagement.findIndex(
+        item => item.subject === subject
       );
       
-      if (courseIndex >= 0) {
-        dailyAnalytics.courseEngagement[courseIndex].views += 1;
+      if (subjectIndex >= 0) {
+        // Update existing subject engagement
+        const updatePath = `subjectEngagement.${subjectIndex}.views`;
+        await Analytics.findOneAndUpdate(
+          { date: today },
+          { $inc: { [updatePath]: 1 } }
+        );
       } else {
-        dailyAnalytics.courseEngagement.push({
-          courseId,
-          views: 1,
-          completionRate: 0
-        });
+        // Add new subject engagement
+        const chapter = await Chapter.findOne({ subject });
+        const classLevel = chapter ? chapter.classLevel : null;
+        
+        const classLevelDistribution = {};
+        if (classLevel) {
+          classLevelDistribution[classLevel] = 1;
+        }
+        
+        await Analytics.findOneAndUpdate(
+          { date: today },
+          { 
+            $push: { 
+              subjectEngagement: {
+                subject,
+                views: 1,
+                completionRate: 0,
+                classLevelDistribution
+              }
+            }
+          }
+        );
       }
-    } else if (activityType === 'exercise_complete') {
-      dailyAnalytics.totalExercisesCompleted += 1;
-    } else if (activityType === 'quiz_attempt') {
-      dailyAnalytics.totalQuizzesAttempted += 1;
-      
-      // Update average score
-      const currentTotal = dailyAnalytics.averageScore * (dailyAnalytics.totalQuizzesAttempted - 1);
-      dailyAnalytics.averageScore = (currentTotal + (score || 0)) / dailyAnalytics.totalQuizzesAttempted;
     }
-
+    
+    // Update average score for quiz attempts
+    if (activityType === 'quiz_attempt' && score !== undefined) {
+      const analytics = await Analytics.findOne({ date: today });
+      if (analytics) {
+        const currentTotal = analytics.averageScore * (analytics.totalQuizzesAttempted - 1);
+        const newAverage = (currentTotal + (score || 0)) / analytics.totalQuizzesAttempted;
+        
+        await Analytics.findOneAndUpdate(
+          { date: today },
+          { averageScore: newAverage }
+        );
+      }
+    }
+    
     // Count unique users for the day
     const uniqueUsers = await Activity.distinct('userId', {
       createdAt: { $gte: today }
     });
-    dailyAnalytics.dailyActiveUsers = uniqueUsers.length;
-
-    await dailyAnalytics.save();
+    
+    await Analytics.findOneAndUpdate(
+      { date: today },
+      { dailyActiveUsers: uniqueUsers.length }
+    );
 
     res.status(200).json({ 
       success: true, 
@@ -157,24 +322,22 @@ export const trackActivity = async (req, res) => {
 export const getUserCourseProgress = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { courseId } = req.params;
+    const { subject } = req.params;
 
-    const progress = await Progress.findOne({ userId, courseId })
-      .populate('completedLessons', 'title')
-      .populate('completedExercises', 'title')
-      .populate('completedQuizzes', 'title');
-
+    const progress = await Progress.findOne({ userId, subject });
+    
     if (!progress) {
       return res.status(200).json({ 
         progress: 0,
         completedLessons: [],
         completedExercises: [],
         completedQuizzes: [],
+        completedChapters: [],
+        chapterProgress: [],
         totalTimeSpent: 0,
         certificateIssued: false
       });
     }
-
     res.status(200).json(progress);
   } catch (error) {
     console.error('Error getting user progress:', error);
@@ -385,4 +548,42 @@ export const getAdminAnalytics = async (req, res) => {
     });
   }
 };
+export const getExerciseActivity = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { lessonId } = req.params; 
+    const activities = await Activity.find({ 
+      userId, 
+      lessonId, 
+      activityType: { $in: ['exercise_complete', 'exercise_attempt'] } 
+    });
+    if (!activities) {
+      return res.status(404).json({ message: 'No exercise activity found' });
+    }
+
+    res.status(200).json(activities);
+  } catch (error) {
+    console.error('Error getting exercise activity:', error); 
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
+
+export const getQuizzActivity = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { lessonId } = req.params; 
+    const activities = await Activity.find({
+      userId,
+      lessonId,
+      activityType: { $in: ['quiz_attempt', 'quiz_complete'] }
+    });
+    if (!activities) {
+      return res.status(404).json({ message: 'No quiz activity found' });
+    }
+    res.status(200).json(activities);
+  } catch (error) {
+    console.error('Error getting quiz activity:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
 

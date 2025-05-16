@@ -27,6 +27,10 @@ import AdminCoursesPage from './pages/Admin-pages/AdminCoursesPage'
 import AdminUsersPage from './pages/Admin-pages/AdminUsersPage'
 import AdminSettingsPage from './pages/Admin-pages/AdminSettingsPage'
 import AddCourse from './pages/Admin-pages/AddCourse'
+import CourseViewPage from './pages/Admin-pages/CourseViewPage'
+import LessonEditPage from './pages/Admin-pages/LessonEditPage'
+//teacher pages
+import TeacherDashboardPage from '../src/pages/Teacher-page/TeacherDashboardPage'
 
 function App() {
   const {theme,setTheme} = useTheme();
@@ -53,16 +57,21 @@ function App() {
                 <Route path="settings" element={<SettingsPage />} />
                 
                 {/* Nested course routes */}
-                <Route path="courses/:courseId" element={<CourseContent />} />
-                <Route path="courses/:courseId/chapters/:chapterId/lessons/:lessonId" element={<LessonPage />} />
-                <Route path="courses/:courseId/chapters/:chapterId/exercises/:exerciseId" element={<ExercisePage />} />
-                <Route path="courses/:courseId/chapters/:chapterID/quizzes/:quizId" element={<QuizPage />} />
+                <Route path="courses/:subject" element={<CourseContent />} />
+                <Route path="courses/:subject/chapters/:chapterId/lessons/:lessonId" element={<LessonPage />} />
+                <Route path="courses/:subject/chapters/:chapterId/lessons/:lessonId/exercises/:exerciseId" element={<ExercisePage />} />
+                <Route path="courses/:subject/chapters/:chapterID/lessons/:lessonId/quizzes/:quizId" element={<QuizPage />} />
               </Route>
             </Route>
 
             {/* Protected Teacher routes */}
             <Route element={<ProtectedRoute allowedRoles={['teacher']} />}>
-              <Route path="/teacher" element={<TeacherDashboard />} />
+              <Route path="/teacher" element={<TeacherDashboard />} >
+                <Route index element={<TeacherDashboardPage/>} />
+                <Route path="courses" element={<CoursesPage />} />
+                <Route path="messages" element={<MessagesPage />} />
+                <Route path="settings" element={<SettingsPage />} />
+              </Route>
             </Route>
 
             {/* Protected Admin routes */}
@@ -73,7 +82,10 @@ function App() {
                 <Route path="users" element={<AdminUsersPage />} />
                 <Route path="settings" element={<AdminSettingsPage />} />
 
+                {/* Nested admin course routes */}
                 <Route path="courses/add" element={<AddCourse />} />
+                <Route path="courses/:id/view" element={<CourseViewPage />} />
+                <Route path="courses/:id/chapters/:chapterId/lessons/:lessonId/edit" element={<LessonEditPage />} />
               </Route>
             </Route>
 

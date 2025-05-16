@@ -1,303 +1,294 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect,useRef } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
-import { ArrowLeft, ArrowRight, CheckCircle, XCircle, HelpCircle } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { ArrowLeft, ArrowRight, CheckCircle, Code, FileText, PenTool, Award } from "lucide-react";
 import { toast } from 'sonner';
+import { Badge } from "@/components/ui/badge";
+import { axiosPrivate } from '@/api/axios';
 
 function ExercisePage() {
-  const { courseId, exerciseId } = useParams();
+  const { lessonId, exerciseId,chapterId,subject } = useParams();
   const navigate = useNavigate();
   const [exercise, setExercise] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [answers, setAnswers] = useState({});
-  const [showFeedback, setShowFeedback] = useState(false);
-  const [progress, setProgress] = useState(0);
-
-  useEffect(() => {
-    // In a real app, fetch the exercise data from your API
-    const fetchExercise = async () => {
-      try {
-        // Simulate API call
-        setTimeout(() => {
-          // Mock exercise data
-          const mockExercise = {
-            id: parseInt(exerciseId),
-            title: "Construction de triangles",
-            courseId: parseInt(courseId),
-            description: "Exercices sur les propriétés des triangles et leurs constructions",
-            questions: [
-              {
-                id: 1,
-                question: "Quelle est la somme des angles intérieurs d'un triangle?",
-                options: [
-                  { id: "a", text: "90 degrés" },
-                  { id: "b", text: "180 degrés" },
-                  { id: "c", text: "270 degrés" },
-                  { id: "d", text: "360 degrés" }
-                ],
-                correctAnswer: "b",
-                explanation: "La somme des angles intérieurs d'un triangle est toujours égale à 180 degrés."
-              },
-              {
-                id: 2,
-                question: "Dans un triangle rectangle, l'hypoténuse est:",
-                options: [
-                  { id: "a", text: "Le côté le plus court" },
-                  { id: "b", text: "Le côté opposé à l'angle droit" },
-                  { id: "c", text: "Le côté adjacent à l'angle droit" },
-                  { id: "d", text: "La hauteur du triangle" }
-                ],
-                correctAnswer: "b",
-                explanation: "L'hypoténuse est le côté opposé à l'angle droit dans un triangle rectangle. C'est aussi le côté le plus long."
-              },
-              {
-                id: 3,
-                question: "Un triangle équilatéral a:",
-                options: [
-                  { id: "a", text: "Trois côtés de longueurs différentes" },
-                  { id: "b", text: "Deux côtés de même longueur" },
-                  { id: "c", text: "Trois côtés de même longueur" },
-                  { id: "d", text: "Un angle droit" }
-                ],
-                correctAnswer: "c",
-                explanation: "Un triangle équilatéral a trois côtés de même longueur et trois angles égaux de 60 degrés chacun."
-              },
-              {
-                id: 4,
-                question: "Selon le théorème de Pythagore, dans un triangle rectangle avec des côtés a, b et une hypoténuse c:",
-                options: [
-                  { id: "a", text: "a² + b² = c²" },
-                  { id: "b", text: "a + b = c" },
-                  { id: "c", text: "a² - b² = c²" },
-                  { id: "d", text: "a × b = c" }
-                ],
-                correctAnswer: "a",
-                explanation: "Le théorème de Pythagore établit que dans un triangle rectangle, le carré de la longueur de l'hypoténuse est égal à la somme des carrés des longueurs des deux autres côtés."
-              }
-            ],
-            lessonId: 2,
-            nextContent: {
-              type: "quiz",
-              id: 1,
-              title: "Quiz de mi-parcours"
-            }
-          };
-          
-          setExercise(mockExercise);
-          setLoading(false);
-        }, 1000);
-      } catch (error) {
-        console.error("Error fetching exercise:", error);
-        setLoading(false);
-      }
-    };
-
-    fetchExercise();
-  }, [courseId, exerciseId]);
-
-  useEffect(() => {
-    // Update progress based on answered questions
-    if (exercise) {
-      const answeredCount = Object.keys(answers).length;
-      const newProgress = Math.round((answeredCount / exercise.questions.length) * 100);
-      setProgress(newProgress);
-    }
-  }, [answers, exercise]);
-
-  const handleAnswer = (questionId, answerId) => {
-    if (showFeedback) return; // Prevent changing answer during feedback
-
-    setAnswers({
-      ...answers,
-      [questionId]: answerId
-    });
-  };
-
-  const checkAnswer = () => {
-    const currentQuestionData = exercise.questions[currentQuestion];
-    if (!answers[currentQuestionData.id]) {
-      toast.warning("Veuillez sélectionner une réponse avant de continuer.");
+  const [userSolution, setUserSolution] = useState('');
+  const [showSolution, setShowSolution] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const startTimeRef = useRef(Date.now());
+  // Handle form submission
+  const handleSubmit = async () => {
+    if (!userSolution.trim()) {
+      toast.warning("Veuillez entrer votre solution avant de soumettre.");
       return;
     }
     
-    setShowFeedback(true);
-  };
-
-  const handleNext = () => {
-    setShowFeedback(false);
-    
-    if (currentQuestion < exercise.questions.length - 1) {
-      setCurrentQuestion(currentQuestion + 1);
-    } else {
-      // Exercise completed
-      toast.success("Exercice terminé!");
+    try {
+      // Calculate time spent in seconds
+      const timeSpent = Math.floor((Date.now() - startTimeRef.current) / 1000);
       
-      // Navigate to the next content if available
-      if (exercise.nextContent) {
-        if (exercise.nextContent.type === "quiz") {
-          navigate(`/student/courses/${courseId}/quiz/${exercise.nextContent.id}`);
-        } else {
-          navigate(`/student/courses/${courseId}/lesson/${exercise.nextContent.id}`);
+      // Determine if the solution is correct (this is a placeholder - you'll need to implement actual validation)
+      const isCorrect = userSolution.trim().toLowerCase() === (exercise.solution || '').trim().toLowerCase();
+      
+      // Track exercise completion in analytics with the appropriate activity type
+      await axiosPrivate.post(`/courses/analytics/track`, {
+        activityType: isCorrect ? 'exercise_complete' : 'exercise_attempt',
+        subject: subject,
+        chapterId: chapterId,
+        lessonId: lessonId,
+        exerciseId: exerciseId,
+        score: isCorrect ? 100 : 0, // Score based on correctness
+        timeSpent: timeSpent,
+        metadata: {
+          exerciseType: exercise.type,
+          points: exercise.points,
+          solutionLength: userSolution.length,
+          isCorrect: isCorrect
         }
-      } else {
-        navigate(`/student/courses/${courseId}`);
-      }
+      });
+      
+      setSubmitted(true);
+      toast.success(isCorrect 
+        ? "Solution correcte soumise avec succès!" 
+        : "Solution soumise. Consultez la solution modèle pour vous améliorer.");
+    } catch (err) {
+      console.error("Error submitting solution:", err);
+      toast.error("Erreur lors de la soumission de votre solution");
     }
   };
 
-  const handlePrevious = () => {
-    setShowFeedback(false);
-    
-    if (currentQuestion > 0) {
-      setCurrentQuestion(currentQuestion - 1);
-    } else {
-      // Go back to the lesson
-      navigate(`/student/courses/${courseId}/lesson/${exercise.lessonId}`);
+  // Fetch exercise data if not provided as prop
+  useEffect(() => {
+    const fetchExercise = async () => {
+      setLoading(true);
+      try {
+        const response = await axiosPrivate.get(`/courses/student/lessons/${lessonId}/exercises/${exerciseId}`);
+        console.log(response.data)
+        if (response.data) {
+          setExercise(response.data.exercise);
+        }
+      } catch (err) {
+        console.error("Error fetching exercise:", err);
+        toast.error("Impossible de charger l'exercice");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchExercise();
+  }, [lessonId, exerciseId]);
+
+  const handleShowSolution = () => {
+    setShowSolution(true);
+  };
+
+  const getExerciseTypeIcon = (type) => {
+    switch (type) {
+      case 'coding':
+        return <Code className="h-4 w-4" />;
+      case 'written':
+        return <PenTool className="h-4 w-4" />;
+      case 'project':
+        return <FileText className="h-4 w-4" />;
+      default:
+        return <FileText className="h-4 w-4" />;
+    }
+  };
+  
+  const getExerciseTypeLabel = (type) => {
+    switch (type) {
+      case 'coding':
+        return 'Code';
+      case 'written':
+        return 'Rédaction';
+      case 'project':
+        return 'Projet';
+      default:
+        return 'Exercice';
     }
   };
 
   if (loading) {
     return (
       <div className="container mx-auto p-6">
-        <div className="animate-pulse">
-          <div className="h-8 bg-muted rounded w-1/3 mb-4"></div>
-          <div className="h-4 bg-muted rounded w-2/3 mb-8"></div>
-          <div className="h-64 bg-muted rounded w-full mb-8"></div>
-          <div className="flex justify-between">
-            <div className="h-10 bg-muted rounded w-24"></div>
-            <div className="h-10 bg-muted rounded w-24"></div>
+        <div className="animate-pulse space-y-6">
+          <div className="flex justify-between items-center">
+            <div className="h-8 bg-muted rounded w-32"></div>
+            <div className="h-6 bg-muted rounded w-20"></div>
           </div>
+          <div>
+            <div className="h-10 bg-muted rounded w-3/4 mb-2"></div>
+            <div className="h-4 bg-muted rounded w-1/2 mb-4"></div>
+            <div className="h-2 bg-muted rounded w-full mb-2"></div>
+          </div>
+          <div className="h-64 bg-muted rounded w-full"></div>
+          <div className="h-40 bg-muted rounded w-full"></div>
         </div>
       </div>
     );
   }
 
-  const currentQuestionData = exercise.questions[currentQuestion];
-  const isCorrect = answers[currentQuestionData.id] === currentQuestionData.correctAnswer;
+  if (!exercise) {
+    return (
+      <div className="container mx-auto p-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Exercice non disponible</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>Cet exercice n'est pas disponible ou a été supprimé.</p>
+          </CardContent>
+          <CardFooter>
+            <Button >
+              Retour aux exercices
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto p-6">
-      {/* Breadcrumb and navigation */}
+      {/* Exercise header with back button and type badge */}
       <div className="flex justify-between items-center mb-6">
-        <Link to={`/student/courses/${courseId}`} className="text-primary hover:underline flex items-center">
+        <Button 
+          variant="ghost" 
+          onClick={() => navigate(`/student/courses/${subject}/chapters/${chapterId}/lessons/${lessonId}?tab=exercises`)}
+          className="flex items-center p-0 hover:bg-transparent"
+        >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Retour au cours
-        </Link>
-        <div className="flex items-center">
-          <span className="text-sm text-muted-foreground">
-            Question {currentQuestion + 1} sur {exercise.questions.length}
-          </span>
-        </div>
+          Retour aux exercices
+        </Button>
+        <Badge variant="outline" className="flex items-center gap-1">
+          {getExerciseTypeIcon(exercise.type)}
+          {getExerciseTypeLabel(exercise.type)}
+        </Badge>
       </div>
 
-      {/* Exercise title and progress */}
+      {/* Exercise title, description and progress */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">{exercise.title}</h1>
-        <p className="text-muted-foreground mb-4">{exercise.description}</p>
-        <div className="flex items-center mb-2">
-          <Progress value={progress} className="h-2 flex-1 mr-4" />
-          <span className="text-sm font-medium">{progress}%</span>
+        {exercise.description && (
+          <p className="text-muted-foreground mb-4">{exercise.description}</p>
+        )}
+        <div className="flex items-center text-sm text-muted-foreground">
+          <Award className="h-4 w-4 mr-1 text-amber-400" />
+          Points: {exercise.points || 10}
         </div>
       </div>
 
-      {/* Question card */}
+      {/* Exercise content/instructions */}
       <Card className="mb-8">
         <CardHeader>
-          <CardTitle className="text-xl">
-            {currentQuestionData.question}
-          </CardTitle>
+          <CardTitle>Instructions</CardTitle>
+          {exercise.type === 'coding' && (
+            <CardDescription>
+              Écrivez votre code pour résoudre le problème ci-dessous.
+            </CardDescription>
+          )}
+          {exercise.type === 'written' && (
+            <CardDescription>
+              Rédigez votre réponse en suivant les instructions ci-dessous.
+            </CardDescription>
+          )}
+          {exercise.type === 'project' && (
+            <CardDescription>
+              Suivez les étapes du projet et soumettez votre solution.
+            </CardDescription>
+          )}
         </CardHeader>
         <CardContent>
-          <RadioGroup 
-            value={answers[currentQuestionData.id] || ""}
-            onValueChange={(value) => handleAnswer(currentQuestionData.id, value)}
-            className="space-y-3"
-          >
-            {currentQuestionData.options.map((option) => (
-              <div 
-                key={option.id} 
-                className={`flex items-center space-x-2 p-3 rounded-lg border ${
-                  showFeedback && option.id === currentQuestionData.correctAnswer
-                    ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
-                    : showFeedback && option.id === answers[currentQuestionData.id] && !isCorrect
-                    ? 'border-red-500 bg-red-50 dark:bg-red-900/20'
-                    : 'border-input'
-                }`}
-              >
-                <RadioGroupItem 
-                  value={option.id} 
-                  id={`option-${option.id}`} 
-                  disabled={showFeedback}
-                />
-                <Label 
-                  htmlFor={`option-${option.id}`}
-                  className="flex-1 cursor-pointer"
-                >
-                  {option.text}
-                </Label>
-                {showFeedback && option.id === currentQuestionData.correctAnswer && (
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                )}
-                {showFeedback && option.id === answers[currentQuestionData.id] && !isCorrect && (
-                  <XCircle className="h-5 w-5 text-red-500" />
-                )}
-              </div>
-            ))}
-          </RadioGroup>
+          <div className="prose dark:prose-invert max-w-none">
+            <div dangerouslySetInnerHTML={{ __html: exercise.content }} />
+          </div>
         </CardContent>
-        {showFeedback && (
-          <CardFooter className="flex flex-col items-start border-t p-4">
-            <div className={`p-3 rounded-lg w-full ${
-              isCorrect ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'
-            }`}>
-              <div className="flex items-start mb-2">
-                {isCorrect ? (
-                  <CheckCircle className="h-5 w-5 text-green-500 mr-2 mt-0.5" />
-                ) : (
-                  <XCircle className="h-5 w-5 text-red-500 mr-2 mt-0.5" />
-                )}
-                <div>
-                  <p className="font-medium">
-                    {isCorrect ? 'Bonne réponse!' : 'Réponse incorrecte'}
-                  </p>
-                  <p className="text-sm mt-1">{currentQuestionData.explanation}</p>
-                </div>
-              </div>
-            </div>
-          </CardFooter>
-        )}
       </Card>
+
+      {/* Solution input */}
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle>Votre Solution</CardTitle>
+          <CardDescription>
+            {exercise.type === 'coding' 
+              ? "Écrivez votre code ici. Assurez-vous qu'il répond à toutes les exigences."
+              : "Rédigez votre réponse ici en suivant les instructions."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Textarea
+            placeholder={
+              exercise.type === 'coding' 
+                ? "// Entrez votre code ici" 
+                : exercise.type === 'written'
+                  ? "Rédigez votre réponse ici..."
+                  : "Décrivez votre solution ici..."
+            }
+            className="min-h-[200px] font-mono"
+            value={userSolution}
+            onChange={(e) => setUserSolution(e.target.value)}
+            disabled={submitted}
+          />
+        </CardContent>
+        <CardFooter className="flex justify-between">
+          {!submitted ? (
+            <Button onClick={handleSubmit} className="w-full">
+              Soumettre la solution
+            </Button>
+          ) : (
+            <div className="w-full flex items-center justify-center p-2 bg-green-50 dark:bg-green-900/20 rounded-md">
+              <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
+              <span>Solution soumise avec succès!</span>
+            </div>
+          )}
+        </CardFooter>
+      </Card>
+
+      {/* Model solution (shown only after submission or when requested) */}
+      {(submitted || showSolution) && exercise.solution && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Solution modèle</CardTitle>
+            <CardDescription>
+              Voici une solution de référence pour cet exercice.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="bg-muted p-4 rounded-md font-mono whitespace-pre-wrap">
+              {exercise.solution}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Navigation buttons */}
       <div className="flex justify-between mt-8">
         <Button 
           variant="outline" 
-          onClick={handlePrevious}
+          onClick={() => navigate(`/student/courses/${subject}/chapters/${chapterId}/lessons/${lessonId}?tab=exercises`)}
           className="flex items-center"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          {currentQuestion === 0 ? 'Retour à la leçon' : 'Question précédente'}
+          Retour aux exercices
         </Button>
         
-        {!showFeedback ? (
+        {!submitted && !showSolution && exercise.solution && (
           <Button 
-            onClick={checkAnswer}
+            variant="outline"
+            onClick={handleShowSolution}
             className="flex items-center"
           >
-            Vérifier
-            <HelpCircle className="h-4 w-4 ml-2" />
+            Voir la solution
           </Button>
-        ) : (
+        )}
+        
+        {submitted && (
           <Button 
-            onClick={handleNext}
+            onClick={() => navigate(`/student/courses/${subject}/chapters/${chapterId}/lessons/${lessonId}?tab=exercises`)}
             className="flex items-center"
           >
-            {currentQuestion === exercise.questions.length - 1 ? 'Terminer' : 'Question suivante'}
+            Continuer
             <ArrowRight className="h-4 w-4 ml-2" />
           </Button>
         )}

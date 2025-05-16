@@ -12,7 +12,10 @@ import {
     addTeacher,
     getTeachers,
     deleteTeacher,
-    updateTeacher
+    updateTeacher,
+    getStudentsByClass,
+    getTeacherById,
+    getTeacherBySubjectAndLevel
 } from '../controllers/auth.controller.js';
 import { googleAuth, googleCallback } from '../controllers/auth.controller.js';
 import { verifyToken } from '../middleware/auth.middleware.js';
@@ -36,7 +39,10 @@ router.get('/users/:id', verifyToken, getProfile);
 
 router.post('/users/add-teacher', verifyToken, addTeacher);
 router.get('/teachers',verifyToken, getTeachers);
+router.get('/students/by-class/:classLevel', verifyToken, getStudentsByClass);
+router.get('/teachers/:id', verifyToken, getTeacherById); // Assuming you have a getProfile route for teachers als
 router.delete('/teachers/:id', verifyToken, deleteTeacher);
+router.get('/teachers/by-subject/:subject/level/:studentLevel',getTeacherBySubjectAndLevel);
 router.put('/teachers/:id', verifyToken, updateTeacher);
 // Update this route to handle file uploads properly
 router.post('/users/update-profile',verifyToken, upload.single('avatar'),updateProfile );

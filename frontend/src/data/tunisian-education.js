@@ -3,7 +3,7 @@ export const classes = {
   "1ere_annee": [
     { name: "Arabe", icon: "Book" },
     { name: "Français", icon: "Languages" },
-    { name: "Mathématiques", icon: "Calculator" },
+    { name: "Mathematics", icon: "Calculator" },
     { name: "Éveil scientifique", icon: "Flask" },
     { name: "Éducation islamique", icon: "Moon" },
     { name: "Éducation civique", icon: "Landmark" }
@@ -262,7 +262,7 @@ export const classes = {
     { name: "Arabe", icon: "Book" },
     { name: "Français", icon: "Languages" },
     { name: "Anglais", icon: "Languages" },
-    { name: "Mathématiques", icon: "Calculator" },
+    { name: "Mathematics", icon: "Calculator" },
     { name: "Économie", icon: "TrendingUp" },
     { name: "Gestion", icon: "Briefcase" },
     { name: "Histoire-Géographie", icon: "Globe" },

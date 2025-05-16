@@ -1,154 +1,126 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams, Link, useNavigate,useLocation} from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, ArrowRight, CheckCircle, Clock } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft,CheckCircle, Clock, FileText, Download, BookOpen, Award, Play, ExternalLink } from "lucide-react";
+import { axiosPrivate } from '@/api/axios';
+import ReactPlayer from 'react-player';
+import ExerciseList from '@/pages/Student-pages/components/ExerciseList';
+import QuizzList from '@/pages/Student-pages/components/QuizzList';
 
 function LessonPage() {
-  const { courseId, lessonId } = useParams();
+  const { subject, chapterId, lessonId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState("content");
   const [lesson, setLesson] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [progress, setProgress] = useState(0);
-  const [currentSection, setCurrentSection] = useState(0);
+  const [progress, setProgress] = useState({});
+  const [readingProgress, setReadingProgress] = useState(0);
+  const [completed, setCompleted] = useState(false);
+  const contentRef = useRef(null);
+  // Add time tracking
+  const [startTime, setStartTime] = useState(null);
+  const [timeSpent, setTimeSpent] = useState(0);
+  const timeIntervalRef = useRef(null);
+
 
   useEffect(() => {
-    // In a real app, fetch the lesson data from your API
     const fetchLesson = async () => {
       try {
-        // Simulate API call
-        setTimeout(() => {
-          // Mock lesson data
-          const mockLesson = {
-            id: parseInt(lessonId),
-            title: "Les angles et les triangles",
-            courseId: parseInt(courseId),
-            duration: "20 min",
-            sections: [
-              {
-                id: 1,
-                title: "Introduction aux angles",
-                content: `
-                  <h2>Qu'est-ce qu'un angle?</h2>
-                  <p>Un angle est formé par deux demi-droites ayant la même origine. Cette origine est appelée le sommet de l'angle.</p>
-                  <p>Les angles sont mesurés en degrés (°) ou en radians. Un angle complet mesure 360° ou 2π radians.</p>
-                  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/59/Angle_radian.svg/300px-Angle_radian.svg.png" alt="Angle diagram" class="my-4 mx-auto" />
-                  <h3>Types d'angles</h3>
-                  <ul>
-                    <li><strong>Angle aigu</strong>: mesure moins de 90°</li>
-                    <li><strong>Angle droit</strong>: mesure exactement 90°</li>
-                    <li><strong>Angle obtus</strong>: mesure plus de 90° mais moins de 180°</li>
-                    <li><strong>Angle plat</strong>: mesure exactement 180°</li>
-                  </ul>
-                `
-              },
-              {
-                id: 2,
-                title: "Les triangles",
-                content: `
-                  <h2>Propriétés des triangles</h2>
-                  <p>Un triangle est un polygone à trois côtés. La somme des angles intérieurs d'un triangle est toujours égale à 180°.</p>
-                  <h3>Types de triangles</h3>
-                  <ul>
-                    <li><strong>Triangle équilatéral</strong>: trois côtés égaux et trois angles égaux (60° chacun)</li>
-                    <li><strong>Triangle isocèle</strong>: deux côtés égaux et deux angles égaux</li>
-                    <li><strong>Triangle scalène</strong>: aucun côté égal et aucun angle égal</li>
-                    <li><strong>Triangle rectangle</strong>: possède un angle droit (90°)</li>
-                  </ul>
-                  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Triangle.Equilateral.svg/300px-Triangle.Equilateral.svg.png" alt="Triangle types" class="my-4 mx-auto" />
-                `
-              },
-              {
-                id: 3,
-                title: "Théorème de Pythagore",
-                content: `
-                  <h2>Le théorème de Pythagore</h2>
-                  <p>Dans un triangle rectangle, le carré de la longueur de l'hypoténuse est égal à la somme des carrés des longueurs des deux autres côtés.</p>
-                  <div class="bg-muted p-4 rounded-md my-4 text-center">
-                    <p class="text-lg font-bold">a² + b² = c²</p>
-                    <p class="text-sm">où c est l'hypoténuse et a et b sont les deux autres côtés</p>
-                  </div>
-                  <p>Ce théorème est fondamental en géométrie et a de nombreuses applications pratiques.</p>
-                  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/Pythagorean.svg/300px-Pythagorean.svg.png" alt="Pythagoras theorem" class="my-4 mx-auto" />
-                  <h3>Exemple</h3>
-                  <p>Si a = 3 et b = 4, alors c² = 3² + 4² = 9 + 16 = 25, donc c = 5.</p>
-                `
-              }
-            ],
-            nextLesson: {
-              id: 3,
-              title: "Les cercles et les polygones"
-            },
-            prevLesson: {
-              id: 1,
-              title: "Les points et les lignes"
-            },
-            hasExercise: true,
-            exerciseId: 2
-          };
-          
-          setLesson(mockLesson);
-          setLoading(false);
-        }, 1000);
-      } catch (error) {
-        console.error("Error fetching lesson:", error);
+        const response = await axiosPrivate.get(`/courses/student/lessons/${lessonId}`);
+        setLesson(response.data.lesson);
+        setCompleted(response.data.lesson.completed || false);
+        setLoading(false);
+      } catch (err) {
+        console.error('Error fetching lesson:', err);
         setLoading(false);
       }
     };
-
+    const fetchProgress = async () => {
+      try {
+        const progressResponse = await axiosPrivate.get(`/courses/analytics/progress/${subject}`);
+        if (progressResponse.data && progressResponse.data.progress) {
+          setProgress(progressResponse.data);
+          setCompleted(progressResponse.data.completedLessons.includes(lessonId))
+        }
+      } catch (progressErr) {
+        console.error('Error fetching progress:', progressErr);
+      }
+    };
     fetchLesson();
-  }, [courseId, lessonId]);
+    fetchProgress();
+  }, [lessonId]);
 
+  // Handle resource access tracking
+  const handleResourceClick = async (resourceId) => {
+    try {
+      await axiosPrivate.post('/analytics/track', {
+        activityType: 'resource_access',
+        subject: subject,
+        resourceId: resourceId,
+        metadata: {
+          lessonId: lessonId,
+          chapterId: chapterId,
+          resourceTitle: lesson.resources.find(r => r._id === resourceId)?.title || 'Unknown'
+        }
+      });
+    } catch (err) {
+      console.error('Error recording resource access:', err);
+    }
+  };
+
+  const handleNext = async () => {
+    if (!completed) {
+      try {
+        // First, track the lesson completion activity
+        await axiosPrivate.post('courses/analytics/track', {
+          activityType: 'lesson_complete',
+          subject: subject,
+          chapterId: chapterId,
+          lessonId: lessonId,
+          timeSpent: timeSpent,
+          metadata: {
+            contentType: lesson?.contentType || 'text',
+            readingProgress: readingProgress
+          }
+        });
+        setCompleted(true);
+        
+        // Fetch updated progress
+        try {
+          const progressResponse = await axiosPrivate.get(`courses/analytics/progress/${subject}`);
+          if (progressResponse.data && progressResponse.data.progress) {
+            setProgress(progressResponse.data);
+          }
+        } catch (progressErr) {
+          console.error('Error fetching updated progress:', progressErr);
+        }
+      } catch (err) {
+        console.error('Error marking lesson as complete:', err);
+      }
+    }
+  };
+
+  const handleExerciseClick = (exerciseId) => {
+    navigate(`/student/courses/${subject}/chapters/${chapterId}/lessons/${lessonId}/exercises/${exerciseId}`);
+  };
+
+  const handleQuizClick = (quizId) => {
+    navigate(`/student/courses/${subject}/chapters/${chapterId}/lessons/${lessonId}/quizzes/${quizId}`);
+  };
+
+  // Check for tab parameter in URL
   useEffect(() => {
-    // Update progress based on current section
-    if (lesson) {
-      const newProgress = Math.round(((currentSection + 1) / lesson.sections.length) * 100);
-      setProgress(newProgress);
+    const searchParams = new URLSearchParams(location.search);
+    const tabParam = searchParams.get('tab');
+    if (tabParam && ['content', 'exercises', 'quizzes', 'resources'].includes(tabParam)) {
+      setActiveTab(tabParam);
     }
-  }, [currentSection, lesson]);
-
-  const handlePrevious = () => {
-    if (currentSection > 0) {
-      setCurrentSection(currentSection - 1);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else {
-      // If this is the first section, go back to previous lesson if it exists
-      if (lesson.prevLesson) {
-        navigate(`/student/courses/${courseId}/lesson/${lesson.prevLesson.id}`);
-      } else {
-        navigate(`/student/courses/${courseId}`);
-      }
-    }
-  };
-
-  const handleNext = () => {
-    if (currentSection < lesson.sections.length - 1) {
-      setCurrentSection(currentSection + 1);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else {
-      // If this is the last section, mark as complete and offer to go to exercise
-      // In a real app, you would make an API call to mark the lesson as complete
-      if (lesson.hasExercise) {
-        navigate(`/student/courses/${courseId}/exercise/${lesson.exerciseId}`);
-      } else if (lesson.nextLesson) {
-        navigate(`/student/courses/${courseId}/lesson/${lesson.nextLesson.id}`);
-      } else {
-        navigate(`/student/courses/${courseId}`);
-      }
-    }
-  };
-
-  const markAsComplete = () => {
-    // In a real app, make an API call to mark the lesson as complete
-    console.log("Marking lesson as complete");
-    // Then navigate to the next lesson or back to course
-    if (lesson.nextLesson) {
-      navigate(`/student/courses/${courseId}/lesson/${lesson.nextLesson.id}`);
-    } else {
-      navigate(`/student/courses/${courseId}`);
-    }
-  };
+  }, [location.search]);
 
   if (loading) {
     return (
@@ -166,90 +138,182 @@ function LessonPage() {
     );
   }
 
-  const currentSectionContent = lesson.sections[currentSection];
-
   return (
     <div className="container mx-auto p-6">
       {/* Breadcrumb and navigation */}
       <div className="flex justify-between items-center mb-6">
-        <Link to={`/student/courses/${courseId}`} className="text-primary hover:underline flex items-center">
+        <Link to={`/student/courses/${subject}`} className="text-primary hover:underline flex items-center">
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Retour au cours
+          Retour au chapitre
         </Link>
         <div className="flex items-center">
           <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">{lesson.duration}</span>
+          <span className="text-sm text-muted-foreground">{lesson.estimatedTime} min</span>
+          {completed && (
+            <Badge variant="success" className="ml-2 bg-green-100 text-green-800 border-green-200">
+              <CheckCircle className="h-3 w-3 mr-1" /> Terminé
+            </Badge>
+          )}
         </div>
       </div>
 
       {/* Lesson title and progress */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">{lesson.title}</h1>
         <div className="flex items-center mb-2">
-          <Progress value={progress} className="h-2 flex-1 mr-4" />
-          <span className="text-sm font-medium">{progress}%</span>
-        </div>
-        <div className="flex justify-between text-sm text-muted-foreground">
-          <span>Section {currentSection + 1} sur {lesson.sections.length}</span>
-          <span>{currentSectionContent.title}</span>
-        </div>
+            <Progress value={completed ? 100 : progress.progress} className="h-2 flex-1 mr-4" />
+            <span className="text-sm font-medium">{completed ? 100 : progress.progress}%</span>
+          </div>
+        <h1 className="text-3xl font-bold mb-2">{lesson.title}</h1>
+        {lesson.description && (
+          <p className="text-muted-foreground mb-4">{lesson.description}</p>
+        )}
       </div>
 
-      {/* Section navigation */}
-      <div className="flex mb-6 overflow-x-auto pb-2">
-        {lesson.sections.map((section, index) => (
-          <button
-            key={section.id}
-            onClick={() => setCurrentSection(index)}
-            className={`px-4 py-2 mr-2 rounded-full text-sm whitespace-nowrap ${
-              index === currentSection
-                ? 'bg-primary text-primary-foreground'
-                : index < currentSection
-                ? 'bg-primary/10 text-primary'
-                : 'bg-muted text-muted-foreground'
-            }`}
-          >
-            {index < currentSection && <CheckCircle className="h-3 w-3 inline mr-1" />}
-            {section.title}
-          </button>
-        ))}
-      </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
+        <TabsList className="mb-4">
+          <TabsTrigger value="content" className="flex items-center">
+            <BookOpen className="h-4 w-4 mr-2" />
+            Contenu
+          </TabsTrigger>
+          {lesson.exercises && lesson.exercises.length > 0 && (
+            <TabsTrigger value="exercises" className="flex items-center">
+              <FileText className="h-4 w-4 mr-2" />
+              Exercices ({lesson.exercises.length})
+            </TabsTrigger>
+          )}
+          {lesson.quizzes && lesson.quizzes.length > 0 && (
+            <TabsTrigger value="quizzes" className="flex items-center">
+              <Award className="h-4 w-4 mr-2" />
+              Quiz ({lesson.quizzes.length})
+            </TabsTrigger>
+          )}
+          {lesson.resources && lesson.resources.length > 0 && (
+            <TabsTrigger value="resources" className="flex items-center">
+              <Download className="h-4 w-4 mr-2" />
+              Ressources ({lesson.resources.length})
+            </TabsTrigger>
+          )}
+        </TabsList>
 
-      {/* Lesson content */}
-      <Card className="mb-8">
-        <CardContent className="p-6">
-          <div 
-            className="prose dark:prose-invert max-w-none"
-            dangerouslySetInnerHTML={{ __html: currentSectionContent.content }}
-          />
-        </CardContent>
-      </Card>
-
-      {/* Navigation buttons */}
-      <div className="flex justify-between mt-8">
+        {/* Content Tab */}
+        <TabsContent value="content">
+          <Card className="mb-4">
+            <CardContent className="p-6" ref={contentRef}>
+              {lesson.contentType === 'video' ? (
+                <div className="w-full">
+                  <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+                    {!lesson.cloudinaryUrl ? (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/5 rounded-lg">
+                        <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full"></div>
+                      </div>
+                    ) : (
+                      <ReactPlayer
+                        url={lesson.cloudinaryUrl}
+                        className="absolute inset-0"
+                        width="100%"
+                        height="100%"
+                        controls
+                        playing
+                        light={false}
+                        pip
+                        config={{
+                          file: {
+                            attributes: {
+                              controlsList: 'nodownload',
+                              onContextMenu: e => e.preventDefault()
+                            }
+                          }
+                        }}
+                      />
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div 
+                  className="prose dark:prose-invert max-w-none"
+                  dangerouslySetInnerHTML={{ __html: lesson.content }}
+                />
+              )}
+            </CardContent>
+          </Card>
+          <div className="flex justify-between mt-8">
         <Button 
           variant="outline" 
-          onClick={handlePrevious}
+          onClick={() => navigate(`/student/courses/${subject}`)}
           className="flex items-center"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          {currentSection === 0 && lesson.prevLesson 
-            ? `Leçon précédente` 
-            : `Section précédente`}
+          Retour au chapitre
         </Button>
         
         <Button 
           onClick={handleNext}
           className="flex items-center"
+          variant={completed ? "outline" : "default"}
         >
-          {currentSection === lesson.sections.length - 1 && lesson.hasExercise
-            ? `Passer aux exercices`
-            : currentSection === lesson.sections.length - 1
-            ? `Terminer la leçon`
-            : `Section suivante`}
-          <ArrowRight className="h-4 w-4 ml-2" />
+          {completed ? "Déjà terminé" : "Marquer comme terminé"}
+          {!completed && <CheckCircle className="h-4 w-4 ml-2" />}
         </Button>
       </div>
+        </TabsContent>
+
+        {/* Exercises Tab */}
+        {lesson.exercises && lesson.exercises.length > 0 && (
+          <TabsContent value="exercises">
+            <ExerciseList 
+              exercises={lesson.exercises} 
+              onSelectExercise={handleExerciseClick}
+              completedExercises={progress.completedExercises || []}
+              lessonId={lessonId}
+            />
+          </TabsContent>
+        )}
+
+        {/* Quizzes Tab */}
+        {lesson.quizzes && lesson.quizzes.length > 0 && (
+          <TabsContent value="quizzes">
+            <QuizzList
+              quizzes={lesson.quizzes}
+              onSelectQuiz={handleQuizClick}
+              completedQuizzes={progress.completedQuizzes || []}
+              lessonId={lessonId}
+            />
+          </TabsContent>
+        )}
+
+        {/* Resources Tab */}
+        {lesson.resources && lesson.resources.length > 0 && (
+          <TabsContent value="resources">
+            <div className="grid gap-4 md:grid-cols-2">
+              {lesson.resources.map((resource, index) => (
+                <Card key={index} className="flex items-center p-4 hover:shadow-md transition-shadow">
+                  <div className="mr-4">
+                    {resource.type === 'pdf' && <FileText className="h-8 w-8 text-red-500" />}
+                    {resource.type === 'video' && <Play className="h-8 w-8 text-blue-500" />}
+                    {resource.type === 'link' && <ExternalLink className="h-8 w-8 text-green-500" />}
+                    {resource.type === 'image' && <FileText className="h-8 w-8 text-purple-500" />}
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-medium">{resource.title}</h3>
+                    <p className="text-sm text-muted-foreground">{resource.type}</p>
+                  </div>
+                  <a 
+                    href={resource.url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="ml-2"
+                  >
+                    <Button size="sm" variant="outline">
+                      <Download className="h-4 w-4 mr-1" />
+                      Télécharger
+                    </Button>
+                  </a>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+        )}
+      </Tabs>
     </div>
   );
 }

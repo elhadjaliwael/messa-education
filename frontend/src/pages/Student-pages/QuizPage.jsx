@@ -5,11 +5,12 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft,ArrowRight, Clock, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
+import { ArrowLeft, ArrowRight, Clock, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
 import { toast } from 'sonner';
+import { axiosPrivate } from '@/api/axios';
 
 function QuizPage() {
-  const { courseId, quizId } = useParams();
+  const { chapterId,subject, quizId, lessonId } = useParams();
   const navigate = useNavigate();
   const [quiz, setQuiz] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -19,87 +20,51 @@ function QuizPage() {
   const [quizCompleted, setQuizCompleted] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
   const [score, setScore] = useState(0);
+  const [startTime, setStartTime] = useState(null);
   const timerRef = useRef(null);
 
   useEffect(() => {
-    // In a real app, fetch the quiz data from your API
     const fetchQuiz = async () => {
+      setLoading(true);
       try {
-        // Simulate API call
-        setTimeout(() => {
-          // Mock quiz data
-          const mockQuiz = {
-            id: parseInt(quizId),
-            title: "Quiz de mi-parcours",
-            courseId: parseInt(courseId),
-            description: "Ce quiz évalue votre compréhension des concepts de base de la géométrie.",
-            timeLimit: 20 * 60, // 20 minutes in seconds
-            passingScore: 70,
-            questions: [
-              {
-                id: 1,
-                question: "Quelle est la formule pour calculer l'aire d'un triangle?",
-                options: [
-                  { id: "a", text: "A = b × h" },
-                  { id: "b", text: "A = (b × h) / 2" },
-                  { id: "c", text: "A = π × r²" },
-                  { id: "d", text: "A = b × h × l" }
-                ],
-                correctAnswer: "b"
-              },
-              {
-                id: 2,
-                question: "Dans un triangle rectangle, si les deux côtés de l'angle droit mesurent 5 cm et 12 cm, quelle est la longueur de l'hypoténuse?",
-                options: [
-                  { id: "a", text: "13 cm" },
-                  { id: "b", text: "17 cm" },
-                  { id: "c", text: "60 cm" },
-                  { id: "d", text: "8.5 cm" }
-                ],
-                correctAnswer: "a"
-              },
-              {
-                id: 3,
-                question: "Quel est le théorème qui établit que dans un triangle rectangle, le carré de l'hypoténuse est égal à la somme des carrés des deux autres côtés?",
-                options: [
-                  { id: "a", text: "Théorème de Thalès" },
-                  { id: "b", text: "Théorème de Pythagore" },
-                  { id: "c", text: "Théorème d'Euclide" },
-                  { id: "d", text: "Théorème de Fermat" }
-                ],
-                correctAnswer: "b"
-              },
-              {
-                id: 4,
-                question: "Combien d'angles droits y a-t-il dans un triangle rectangle?",
-                options: [
-                  { id: "a", text: "Aucun" },
-                  { id: "b", text: "Un" },
-                  { id: "c", text: "Deux" },
-                  { id: "d", text: "Trois" }
-                ],
-                correctAnswer: "b"
-              },
-              {
-                id: 5,
-                question: "Quelle est la somme des angles intérieurs d'un quadrilatère?",
-                options: [
-                  { id: "a", text: "180°" },
-                  { id: "b", text: "270°" },
-                  { id: "c", text: "360°" },
-                  { id: "d", text: "540°" }
-                ],
-                correctAnswer: "c"
-              }
-            ]
-          };
+        const response = await axiosPrivate.get(`/courses/student/lessons/${lessonId}/quizzes/${quizId}`);
+        const quizData = response.data.quizz;
+        // Process questions to add unique IDs if they don't exist
+        const processedQuestions = quizData.questions.map((question, index) => {
+          // Add id to question if it doesn't exist
+          const questionId = question._id || `q-${index}`;
           
-          setQuiz(mockQuiz);
-          setTimeLeft(mockQuiz.timeLimit);
-          setLoading(false);
-        }, 1000);
+          // Process options to add unique IDs and find correct answer
+          const options = question.options.map((option, optIndex) => ({
+            id: option._id || `opt-${questionId}-${optIndex}`,
+            text: option.text,
+            isCorrect: option.isCorrect
+          }));
+          
+          // Find the correct answer ID
+          const correctAnswer = options.find(opt => opt.isCorrect)?.id;
+          
+          return {
+            id: questionId,
+            question: question.text,
+            type: question.type,
+            options,
+            correctAnswer,
+            points: question.points || 1
+          };
+        });
+        
+        setQuiz({
+          ...quizData,
+          questions: processedQuestions,
+          timeLimit: quizData.timeLimit * 60 || 600 // Convert minutes to seconds
+        });
+        
+        setTimeLeft(quizData.timeLimit * 60 || 600);
+        setLoading(false);
       } catch (error) {
         console.error("Error fetching quiz:", error);
+        toast.error("Erreur lors du chargement du quiz");
         setLoading(false);
       }
     };
@@ -107,16 +72,16 @@ function QuizPage() {
     fetchQuiz();
 
     return () => {
-      // Clean up timer on unmount
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
     };
-  }, [courseId, quizId]);
+  }, [lessonId, quizId]);
 
   // Timer effect
   useEffect(() => {
     if (quizStarted && !quizCompleted && timeLeft > 0) {
+      setStartTime(Date.now());
       timerRef.current = setInterval(() => {
         setTimeLeft(prev => {
           if (prev <= 1) {
@@ -166,21 +131,49 @@ function QuizPage() {
     }
   };
 
-  const submitQuiz = () => {
+  const submitQuiz = async () => {
     // Calculate score
     let correctCount = 0;
+    let totalPoints = 0;
+    let earnedPoints = 0;
+    
     quiz.questions.forEach(question => {
+      totalPoints += question.points;
       if (answers[question.id] === question.correctAnswer) {
         correctCount++;
+        earnedPoints += question.points;
       }
     });
 
-    const finalScore = Math.round((correctCount / quiz.questions.length) * 100);
+    const finalScore = Math.round((earnedPoints / totalPoints) * 100);
     setScore(finalScore);
     setQuizCompleted(true);
     
     if (timerRef.current) {
       clearInterval(timerRef.current);
+    }
+
+    // Calculate time spent
+    const timeSpent = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
+
+    // Save quiz result to the API
+    try {
+      await axiosPrivate.post(`/courses/analytics/track`, {
+        quizId,
+        score: finalScore,
+        lessonId,
+        chapterId,
+        subject,
+        timeSpent,
+        activityType: finalScore >= quiz.passingScore ? 'quiz_complete' : 'quiz_attempt',
+        answers: Object.keys(answers).map(questionId => ({
+          questionId,
+          answerId: answers[questionId],
+          isCorrect: quiz.questions.find(q => q.id === questionId)?.correctAnswer === answers[questionId]
+        }))
+      });
+    } catch (error) {
+      console.error("Error saving quiz results:", error);
     }
 
     // Show appropriate toast based on score
@@ -207,7 +200,7 @@ function QuizPage() {
     }
   };
 
-  if (loading) {
+  if (loading || !quiz) {
     return (
       <div className="container mx-auto p-6">
         <div className="animate-pulse">
@@ -227,9 +220,9 @@ function QuizPage() {
   if (!quizStarted && !quizCompleted) {
     return (
       <div className="container mx-auto p-6">
-        <Link to={`/student/courses/${courseId}`} className="text-primary hover:underline flex items-center mb-6">
+        <Link to={`/student/courses/${subject}/chapters/${chapterId}/lessons/${lessonId}?tab=quizzes`} className="text-primary hover:underline flex items-center mb-6">
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Retour au cours
+          Retour à la leçon
         </Link>
         
         <Card className="max-w-2xl mx-auto">
@@ -237,7 +230,7 @@ function QuizPage() {
             <CardTitle className="text-2xl">{quiz.title}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p>{quiz.description}</p>
+            <p>{quiz.description || "Ce quiz vous permettra d'évaluer votre compréhension du sujet."}</p>
             
             <div className="bg-muted p-4 rounded-lg space-y-2">
               <div className="flex items-center">
@@ -279,9 +272,9 @@ function QuizPage() {
     
     return (
       <div className="container mx-auto p-6">
-        <Link to={`/student/courses/${courseId}`} className="text-primary hover:underline flex items-center mb-6">
+        <Link to={`/student/courses/${subject}/chapters/${chapterId}/lessons/${lessonId}?tab=quizzes`} className="text-primary hover:underline flex items-center mb-6">
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Retour au cours
+          Retour à la leçon
         </Link>
         
         <Card className="max-w-2xl mx-auto">
@@ -303,6 +296,8 @@ function QuizPage() {
               
               {quiz.questions.map((question, index) => {
                 const isCorrect = answers[question.id] === question.correctAnswer;
+                const selectedOption = question.options.find(o => o.id === answers[question.id]);
+                const correctOption = question.options.find(o => o.id === question.correctAnswer);
                 
                 return (
                   <div 
@@ -324,15 +319,15 @@ function QuizPage() {
                         <p className="font-medium">Question {index + 1}: {question.question}</p>
                         <p className="text-sm mt-1">
                           <span className="font-medium">Votre réponse:</span> {
-                            answers[question.id] 
-                              ? question.options.find(o => o.id === answers[question.id])?.text || 'Non répondu'
+                            selectedOption
+                              ? selectedOption.text
                               : 'Non répondu'
                           }
                         </p>
                         {!isCorrect && (
                           <p className="text-sm mt-1">
                             <span className="font-medium">Réponse correcte:</span> {
-                              question.options.find(o => o.id === question.correctAnswer)?.text
+                              correctOption?.text || "Aucune réponse correcte trouvée"
                             }
                           </p>
                         )}
@@ -345,10 +340,10 @@ function QuizPage() {
           </CardContent>
           <CardFooter className="flex flex-col space-y-2">
             <Button 
-              onClick={() => navigate(`/student/courses/${courseId}`)}
+              onClick={() => navigate(`/student/courses/${subject}/chapters/${chapterId}/lessons/${lessonId}?tab=quizzes`)}
               className="w-full"
             >
-              Retourner au cours
+              Retourner à la leçon
             </Button>
             {!isPassed && (
               <Button 
@@ -411,7 +406,7 @@ function QuizPage() {
             {currentQuestionData.options.map((option) => (
               <div 
                 key={option.id} 
-                className="flex items-center space-x-2 p-3 rounded-lg border border-input"
+                className="flex items-center space-x-2 p-3 rounded-lg border border-input hover:bg-muted/50 transition-colors"
               >
                 <RadioGroupItem 
                   value={option.id} 

@@ -1,210 +1,24 @@
 import React, { useState } from 'react';
-import toast from 'react-hot-toast';
+import {toast} from 'sonner';
 import { axiosPrivate } from '@/api/axios';
 import BasicInfo from './BasicInfo';
 import ChaptersForm from './ChaptersForm';
 import ContentForm from './ContentForm';
 import ReviewForm from './ReviewForm';
+import useCourseStore from '@/store/courseStore';
 
 function AddCourse() {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Course state
-  const [courseData, setCourseData] = useState({
-    name: '',
-    description: '',
-    slug: '',
-    classLevel: '',
-    isPublished: false,
-    chapters: []
-  });
+  // Get only what we need from the store for this component
+  const courseData = useCourseStore(state => state.courseData);
+  const resetCourseData = useCourseStore(state => state.resetCourseData);
   
-  // Current chapter being edited
-  const [currentChapter, setCurrentChapter] = useState({
-    title: '',
-    description: '',
-    order: 1,
-    lessons: [],
-    exercises: [],
-    quizzes: []
-  });
-  
-  // Current lesson being edited
-  const [currentLesson, setCurrentLesson] = useState({
-    title: '',
-    description: '',
-    order: 1,
-    estimatedTime: 30,
-    content: '',
-    resources: []
-  });
-  
-  // Current resource being edited
-  const [currentResource, setCurrentResource] = useState({
-    title: '',
-    url: '',
-    type: 'pdf'
-  });
-  
-  // Handle basic course info changes
-  const handleCourseChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setCourseData({
-      ...courseData,
-      [name]: type === 'checkbox' ? checked : value
-    });
-  };
-  
-  // Handle chapter changes
-  const handleChapterChange = (e) => {
-    const { name, value } = e.target;
-    setCurrentChapter({
-      ...currentChapter,
-      [name]: value
-    });
-  };
-  
-  // Handle lesson changes
-  const handleLessonChange = (e) => {
-    const { name, value } = e.target;
-    setCurrentLesson({
-      ...currentLesson,
-      [name]: value
-    });
-  };
-  
-  // Handle resource changes
-  const handleResourceChange = (e) => {
-    const { name, value } = e.target;
-    setCurrentResource({
-      ...currentResource,
-      [name]: value
-    });
-  };
-  
-  // Add chapter to course
-  const addChapter = () => {
-    if (!currentChapter.title) {
-      toast.error("Chapter title is required");
-      return;
-    }
-    
-    setCourseData({
-      ...courseData,
-      chapters: [...courseData.chapters, { ...currentChapter, id: Date.now() }]
-    });
-    
-    // Reset current chapter
-    setCurrentChapter({
-      title: '',
-      description: '',
-      order: courseData.chapters.length + 1,
-      lessons: [],
-      exercises: [],
-      quizzes: []
-    });
-    
-    toast.success("Chapter added successfully");
-  };
-  
-  // Add lesson to current chapter
-  const addLesson = (chapterId) => {
-    if (!currentLesson.title) {
-      toast.error("Lesson title is required");
-      return;
-    }
-    
-    const updatedChapters = courseData.chapters.map(chapter => {
-      if (chapter.id === chapterId) {
-        return {
-          ...chapter,
-          lessons: [...chapter.lessons, { ...currentLesson, id: Date.now() }]
-        };
-      }
-      return chapter;
-    });
-    
-    setCourseData({
-      ...courseData,
-      chapters: updatedChapters
-    });
-    
-    // Reset current lesson
-    setCurrentLesson({
-      title: '',
-      description: '',
-      order: 1,
-      estimatedTime: 30,
-      content: '',
-      resources: []
-    });
-    
-    toast.success("Lesson added successfully");
-  };
-  
-  // Add resource to current lesson
-  const addResource = () => {
-    if (!currentResource.title || !currentResource.url) {
-      toast.error("Resource title and URL are required");
-      return;
-    }
-    
-    setCurrentLesson({
-      ...currentLesson,
-      resources: [...currentLesson.resources, { ...currentResource, id: Date.now() }]
-    });
-    
-    // Reset current resource
-    setCurrentResource({
-      title: '',
-      url: '',
-      type: 'pdf'
-    });
-  };
-  
-  // Remove chapter
-  const removeChapter = (chapterId) => {
-    setCourseData({
-      ...courseData,
-      chapters: courseData.chapters.filter(chapter => chapter.id !== chapterId)
-    });
-    
-    toast.success("Chapter removed successfully");
-  };
-  
-  // Remove lesson
-  const removeLesson = (chapterId, lessonId) => {
-    const updatedChapters = courseData.chapters.map(chapter => {
-      if (chapter.id === chapterId) {
-        return {
-          ...chapter,
-          lessons: chapter.lessons.filter(lesson => lesson.id !== lessonId)
-        };
-      }
-      return chapter;
-    });
-    
-    setCourseData({
-      ...courseData,
-      chapters: updatedChapters
-    });
-    
-    toast.success("Lesson removed successfully");
-  };
-  
-  // Remove resource
-  const removeResource = (resourceId) => {
-    setCurrentLesson({
-      ...currentLesson,
-      resources: currentLesson.resources.filter(resource => resource.id !== resourceId)
-    });
-  };
-  
-  // Navigate to next step
+  // Navigate to next step with validation
   const nextStep = () => {
-    if (currentStep === 1 && (!courseData.name || !courseData.classLevel)) {
-      toast.error("Course name and class level are required");
+    if (currentStep === 1 && (!courseData.subject || !courseData.classLevel)) {
+      toast.error("Subject and class level are required");
       return;
     }
     
@@ -226,37 +40,49 @@ function AddCourse() {
     setIsSubmitting(true);
     
     try {
-      const response = await axiosPrivate.post('/api/subjects', courseData);
-      toast.success("Course created successfully");
+      // Create each chapter directly (no need to create course first)
+      for (const chapter of courseData.chapters) {
+        // Create chapter with all course data included
+        const chapterResponse = await axiosPrivate.post('/courses', {
+          title: chapter.title,
+          description: chapter.description,
+          order: chapter.order,
+          subject: courseData.subject,
+          classLevel: courseData.classLevel,
+          difficulty: courseData.difficulty
+        });
+        
+        const chapterId = chapterResponse.data.chapterId;
+        
+        // Create lessons for each chapter
+        for (const lesson of chapter.lessons) {
+          await axiosPrivate.post(`/courses/${chapterId}/lessons`, {
+            title: lesson.title,
+            description: lesson.description,
+            order: lesson.order,
+            estimatedTime: lesson.estimatedTime,
+            content: lesson.content,
+            contentType: lesson.contentType,
+            cloudinaryUrl: lesson.cloudinaryUrl,
+            isNew : true,
+            cloudinaryPublicId: lesson.cloudinaryPublicId,
+            exercises: lesson.exercises || [],
+            quizzes: lesson.quizzes || [],
+            resources: lesson.resources || []
+          });
+        }
+      }
       
-      // Reset form or redirect
-      setCourseData({
-        name: '',
-        description: '',
-        slug: '',
-        classLevel: '',
-        isPublished: false,
-        chapters: []
-      });
+      toast.success("Chapters created successfully");
+      // Reset form and go back to step 1
+      resetCourseData();
       setCurrentStep(1);
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to create course");
+      console.error("Error creating chapters:", error);
+      toast.error(error.response?.data?.message || "Failed to create chapters");
     } finally {
       setIsSubmitting(false);
     }
-  };
-  
-  // Generate slug from name
-  const generateSlug = () => {
-    const slug = courseData.name
-      .toLowerCase()
-      .replace(/[^\w\s]/gi, '')
-      .replace(/\s+/g, '-');
-    
-    setCourseData({
-      ...courseData,
-      slug
-    });
   };
   
   return (
@@ -300,54 +126,16 @@ function AddCourse() {
       </div>
       
       {/* Step 1: Basic Course Information */}
-      {currentStep === 1 && (
-        <BasicInfo 
-          courseData={courseData} 
-          setCourseData={setCourseData} 
-          nextStep={nextStep} 
-          handleCourseChange={handleCourseChange} 
-          generateSlug={generateSlug}
-        />
-      )}
+      {currentStep === 1 && <BasicInfo nextStep={nextStep} />}
       
       {/* Step 2: Chapters */}
-      {currentStep === 2 && (
-        <ChaptersForm 
-          courseData={courseData}
-          currentChapter={currentChapter}
-          handleChapterChange={handleChapterChange}
-          addChapter={addChapter}
-          removeChapter={removeChapter}
-          prevStep={prevStep}
-          nextStep={nextStep}
-        />
-      )}
+      {currentStep === 2 && <ChaptersForm prevStep={prevStep} nextStep={nextStep} />}
       
       {/* Step 3: Content (Lessons, Exercises, Quizzes) */}
-      {currentStep === 3 && (
-        <ContentForm 
-          courseData={courseData}
-          currentLesson={currentLesson}
-          currentResource={currentResource}
-          handleLessonChange={handleLessonChange}
-          handleResourceChange={handleResourceChange}
-          addLesson={addLesson}
-          addResource={addResource}
-          removeResource={removeResource}
-          prevStep={prevStep}
-          nextStep={nextStep}
-        />
-      )}
+      {currentStep === 3 && <ContentForm prevStep={prevStep} nextStep={nextStep} />}
       
       {/* Step 4: Review */}
-      {currentStep === 4 && (
-        <ReviewForm 
-          courseData={courseData}
-          prevStep={prevStep}
-          submitCourse={submitCourse}
-          isSubmitting={isSubmitting}
-        />
-      )}
+      {currentStep === 4 && <ReviewForm prevStep={prevStep} submitCourse={submitCourse} isSubmitting={isSubmitting} />}
     </div>
   );
 }

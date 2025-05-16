@@ -13,13 +13,18 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-    }
+        origin: "http://localhost:5173", // Your frontend URL
+        methods: ["GET", "POST"],
+        credentials: true
+    },
+    path: "/api/chat/socket.io" // Match the path in your client and API gateway
 });
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: "http://localhost:5173",
+    credentials: true
+}));
 app.use(express.json());
 
 // Connect to MongoDB
@@ -28,7 +33,7 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/chat')
     .catch(err => console.error('MongoDB connection error:', err));
 
 // Routes
-app.use('/api/messages', messageRoutes);
+app.use('/api/chat', messageRoutes);
 
 // Health check route
 app.get('/', (req, res) => {

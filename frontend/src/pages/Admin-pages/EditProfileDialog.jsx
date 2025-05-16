@@ -19,6 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { classes } from '@/data/tunisian-education';
 
 function EditProfileDialog({isEditModalOpen,setIsEditModalOpen,editingTeacher,setEditingTeacher,handleEditSubmit,handleEditInputChange,handleStatusChange}) {
   return (
@@ -120,6 +121,7 @@ function EditProfileDialog({isEditModalOpen,setIsEditModalOpen,editingTeacher,se
               </Select>
             </div>
             
+            {/* Classes field - Updated to use imported classes data */}
             <div className="grid grid-cols-4 items-start gap-4">
               <Label htmlFor="edit-classes" className="text-right pt-2">
                 Classes
@@ -134,7 +136,14 @@ function EditProfileDialog({isEditModalOpen,setIsEditModalOpen,editingTeacher,se
                         className="ml-1 rounded-full outline-none focus:ring-2 focus:ring-offset-1"
                         onClick={() => {
                           const updatedClasses = editingTeacher.classes.filter((_, i) => i !== index);
-                          setEditingTeacher(prev => ({ ...prev, classes: updatedClasses }));
+                          // Create a synthetic event object with name and value properties
+                          const event = {
+                            target: {
+                              name: 'classes',
+                              value: updatedClasses
+                            }
+                          };
+                          handleEditInputChange(event);
                         }}
                       >
                         <Trash2 className="h-3 w-3" />
@@ -145,10 +154,14 @@ function EditProfileDialog({isEditModalOpen,setIsEditModalOpen,editingTeacher,se
                 <Select 
                   onValueChange={(value) => {
                     if (!editingTeacher.classes.includes(value)) {
-                      setEditingTeacher(prev => ({
-                        ...prev,
-                        classes: [...prev.classes, value]
-                      }));
+                      const updatedClasses = [...editingTeacher.classes, value];
+                      const event = {
+                        target: {
+                          name: 'classes',
+                          value: updatedClasses
+                        }
+                      };
+                      handleEditInputChange(event);
                     }
                   }}
                 >
@@ -156,12 +169,11 @@ function EditProfileDialog({isEditModalOpen,setIsEditModalOpen,editingTeacher,se
                     <SelectValue placeholder="Add class" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="1st Grade">1st Grade</SelectItem>
-                    <SelectItem value="2nd Grade">2nd Grade</SelectItem>
-                    <SelectItem value="3rd Grade">3rd Grade</SelectItem>
-                    <SelectItem value="4th Grade">4th Grade</SelectItem>
-                    <SelectItem value="5th Grade">5th Grade</SelectItem>
-                    <SelectItem value="6th Grade">6th Grade</SelectItem>
+                    {Object.keys(classes).map((classLevel) => (
+                      <SelectItem key={classLevel} value={classLevel}>
+                        {classLevel}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

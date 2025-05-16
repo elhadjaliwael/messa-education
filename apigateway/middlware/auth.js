@@ -5,6 +5,8 @@ dotenv.config();
 export const verifyToken = async (req, res, next) => {
     try {
         const authHeader = req.headers.authorization;
+        console.log("hellow")
+        console.log(authHeader);
         if (!authHeader?.startsWith('Bearer ')) {
             return res.status(401).json({ message: 'Unauthorized' });
         }

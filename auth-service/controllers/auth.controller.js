@@ -609,3 +609,42 @@ export const updateTeacher = async (req, res) => {
         res.status(500).json({ message: 'Server error' }); 
     }
 }
+export const getStudentsByClass = async (req, res) => {
+    try {
+        const classLevel = req.params.classLevel;
+        const students = await User.find({ role: 'student', level: classLevel }).select('-password');
+        res.status(200).json(students); 
+    }catch (error) {
+        console.error('Get students by class error:', error);
+        res.status(500).json({ message: 'Server error' }); 
+    }
+}
+export const getTeacherById = async (req, res) => {
+    try {
+        const teacherId = req.params.id;
+        const teacher = await User.findById(teacherId).select('-password'); 
+        if (!teacher) {
+            return res.status(404).json({ message: 'Teacher not found' });
+
+        }
+        res.status(200).json(teacher);
+
+    }catch (error) {
+        console.error('Get teacher by id error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+}
+export const getTeacherBySubjectAndLevel = async (req, res) => {
+    try {
+        const { subject, studentLevel } = req.params;
+        console.log(subject, studentLevel)
+        console.log("waaa")
+        const teachers = await User.find({ role: 'teacher', subject,  classes: { $in: [studentLevel]} }).select('-password');
+        console.log(teachers)
+        res.status(200).json(teachers); 
+    } 
+    catch (error) {
+        console.error('Get teacher by subject and level error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+}

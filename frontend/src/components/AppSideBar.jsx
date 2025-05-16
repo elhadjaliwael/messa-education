@@ -81,6 +81,26 @@ import {
             },
             ...commonItems
           ]
+        case "teacher":
+          return [
+            {
+              title: "Dashboard",
+              url: "/teacher",
+              icon: LayoutDashboardIcon,
+              isActive: true,
+            },
+            {
+              title: "Courses",
+              url: "/teacher/courses",
+              icon: GraduationCapIcon,
+            },
+            {
+              title: "Messages",
+              url: "/teacher/messages",
+              icon: MessageCircleMore, 
+            },
+           ...commonItems
+          ]
         default:
           return commonItems
       }

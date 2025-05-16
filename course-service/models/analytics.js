@@ -9,12 +9,33 @@ const activitySchema = new mongoose.Schema({
   },
   activityType: {
     type: String,
-    enum: ['course_view', 'exercise_attempt', 'exercise_complete', 'quiz_attempt','lesson_complete' ,'resource_access', 'discussion_post'],
+    enum: [
+      'course_view', 
+      'chapter_view',
+      'lesson_view',
+      'lesson_complete', 
+      'exercise_attempt', 
+      'exercise_complete', 
+      'quiz_attempt',
+      'quiz_complete',
+      'resource_access', 
+      'discussion_post',
+      'discussion_reply',
+      'certificate_earned'
+    ],
     required: true
   },
-  courseId: {
+  subject: {
+    type: String,
+    required: true
+  },
+  chapterId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Course'
+    ref: 'Chapter'
+  },
+  lessonId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Lesson'
   },
   exerciseId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -50,10 +71,12 @@ const progressSchema = new mongoose.Schema({
     required: true,
     ref: 'User'
   },
-  courseId: {
-    type: mongoose.Schema.Types.ObjectId,
-    required: true,
-    ref: 'Course'
+  subject: {
+    type: String,
+    required: true
+  },
+  classLevel: {
+    type: String
   },
   progress: {
     type: Number,
@@ -61,6 +84,10 @@ const progressSchema = new mongoose.Schema({
     min: 0,
     max: 100
   },
+  completedChapters: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Chapter'
+  }],
   completedLessons: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Lesson'
@@ -72,6 +99,45 @@ const progressSchema = new mongoose.Schema({
   completedQuizzes: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Quiz'
+  }],
+  chapterProgress: [{
+    chapterId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Chapter'
+    },
+    title: String,
+    progress: {
+      type: Number,
+      default: 0
+    },
+    totalLessons: {
+      type: Number,
+      default: 0
+    },
+    completedLessons: {
+      type: Number,
+      default: 0
+    },
+    totalExercises: {
+      type: Number,
+      default: 0
+    },
+    completedExercises: {
+      type: Number,
+      default: 0
+    },
+    totalQuizzes: {
+      type: Number,
+      default: 0
+    },
+    completedQuizzes: {
+      type: Number,
+      default: 0
+    },
+    completed: {
+      type: Boolean,
+      default: false
+    }
   }],
   totalTimeSpent: {
     type: Number, // Total time spent in seconds
@@ -90,8 +156,8 @@ const progressSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// Create a compound index for userId and courseId
-progressSchema.index({ userId: 1, courseId: 1 }, { unique: true });
+// Create a compound index for userId and subject
+progressSchema.index({ userId: 1, subject: 1 }, { unique: true });
 
 // Main analytics schema that aggregates data
 const analyticsSchema = new mongoose.Schema({
@@ -108,6 +174,18 @@ const analyticsSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  totalChaptersViewed: {
+    type: Number,
+    default: 0
+  },
+  totalLessonsViewed: {
+    type: Number,
+    default: 0
+  },
+  totalLessonsCompleted: {
+    type: Number,
+    default: 0
+  },
   totalExercisesCompleted: {
     type: Number,
     default: 0
@@ -116,14 +194,17 @@ const analyticsSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  totalQuizzesCompleted: {
+    type: Number,
+    default: 0
+  },
   averageScore: {
     type: Number,
     default: 0
   },
-  courseEngagement: [{
-    courseId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Course'
+  subjectEngagement: [{
+    subject: {
+      type: String
     },
     views: {
       type: Number,
@@ -132,6 +213,11 @@ const analyticsSchema = new mongoose.Schema({
     completionRate: {
       type: Number,
       default: 0
+    },
+    classLevelDistribution: {
+      type: Map,
+      of: Number,
+      default: {}
     }
   }]
 }, { timestamps: true });

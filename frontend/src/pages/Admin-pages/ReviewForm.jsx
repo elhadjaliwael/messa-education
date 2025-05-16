@@ -2,8 +2,9 @@ import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChevronLeft, CheckCircle } from "lucide-react";
-
-function ReviewForm({ courseData, prevStep, submitCourse, isSubmitting }) {
+import useCourseStore from '@/store/courseStore';
+function ReviewForm({ prevStep, submitCourse, isSubmitting }) {
+  const courseData = useCourseStore(state => state.courseData);
   return (
     <Card>
       <CardHeader>
@@ -18,14 +19,14 @@ function ReviewForm({ courseData, prevStep, submitCourse, isSubmitting }) {
           
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-sm text-muted-foreground">Course Name</p>
-              <p className="font-medium">{courseData.name}</p>
-            </div>
-            
-            <div>
               <p className="text-sm text-muted-foreground">Class Level</p>
               <p className="font-medium">{courseData.classLevel.replace(/_/g, ' ')}</p>
             </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Subject</p>
+              <p className="font-medium">{courseData.subject}</p>
+            </div>
+            
             
             <div className="col-span-2">
               <p className="text-sm text-muted-foreground">Description</p>
@@ -54,7 +55,7 @@ function ReviewForm({ courseData, prevStep, submitCourse, isSubmitting }) {
           ) : (
             <div className="space-y-4">
               {courseData.chapters.map((chapter) => (
-                <div key={chapter.id} className="border rounded-md p-4">
+                <div key={chapter.order} className="border rounded-md p-4">
                   <h4 className="font-medium">{chapter.order}. {chapter.title}</h4>
                   <p className="text-sm text-muted-foreground">{chapter.description || 'No description'}</p>
                   
@@ -62,8 +63,12 @@ function ReviewForm({ courseData, prevStep, submitCourse, isSubmitting }) {
                     <p className="text-sm font-medium">Content:</p>
                     <p className="text-sm text-muted-foreground">
                       {chapter.lessons.length} lessons, 
-                      {chapter.exercises.length} exercises, 
-                      {chapter.quizzes.length} quizzes
+                      {chapter.lessons.filter(lesson => lesson.exercises && lesson.exercises.length > 0).length > 0 
+                        ? chapter.lessons.reduce((total, lesson) => total + (lesson.exercises ? lesson.exercises.length : 0), 0) 
+                        : 0} exercises, 
+                      {chapter.lessons.filter(lesson => lesson.quizzes && lesson.quizzes.length > 0).length > 0 
+                        ? chapter.lessons.reduce((total, lesson) => total + (lesson.quizzes ? lesson.quizzes.length : 0), 0) 
+                        : 0} quizzes
                     </p>
                   </div>
                 </div>

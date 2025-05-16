@@ -9,100 +9,182 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { axiosPrivate } from '@/api/axios'
+import useAuth from '@/hooks/useAuth'
 
 
 function CourseContent() {
-  const { courseId, subjectId } = useParams();
+  const { subject } = useParams();
+  const {auth} = useAuth()
   const [progress, setProgress] = useState(0);
-  const [currentCourse, setCurrentCourse] = useState(null);
+  const [chapters, setChapters] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [expandedChapter, setExpandedChapter] = useState("chapter-1"); // Default open first chapter
-  const [completedItems, setCompletedItems] = useState({ lessons: 0, exercises: 0, quizzes: 0 });
+  const [expandedChapter, setExpandedChapter] = useState(null);
+  const [progressData, setProgressData] = useState({ lessons: 0, exercises: 0, quizzes: 0,completedChapters : [],chapterProgress : []});
+
+  // Add loadedChapters state
+  const [loadedChapters, setLoadedChapters] = useState({});
   const navigate = useNavigate();
 
-  function handleLessonClick(chapterId, lessonId) {
-    navigate(`/student/courses/${courseId}/chapters/${chapterId}/lessons/${lessonId}`);
-  }
-  
-  function handleExerciseClick(chapterId, exerciseId) {
-    navigate(`/student/courses/${courseId}/chapters/${chapterId}/exercises/${exerciseId}`);
-  }
-  
-  function handleQuizClick(chapterId, quizId) {
-    navigate(`/student/courses/${courseId}/chapters/${chapterId}/quizzes/${quizId}`);
-  }
-
-  // Calculate completion statistics
   useEffect(() => {
-    if (currentCourse) {
-      let totalLessons = 0;
-      let completedLessons = 0;
-      let totalExercises = 0;
-      let completedExercises = 0;
-      let totalQuizzes = 0;
-      let completedQuizzes = 0;
-
-      currentCourse.chapters.forEach(chapter => {
-        totalLessons += chapter.lessons.length;
-        completedLessons += chapter.lessons.filter(l => l.completed).length;
-        
-        totalExercises += chapter.exercises.length;
-        completedExercises += chapter.exercises.filter(e => e.completed).length;
-        
-        totalQuizzes += chapter.quizzes.length;
-        completedQuizzes += chapter.quizzes.filter(q => q.completed).length;
-      });
-
-      setCompletedItems({
-        lessons: totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0,
-        exercises: totalExercises > 0 ? Math.round((completedExercises / totalExercises) * 100) : 0,
-        quizzes: totalQuizzes > 0 ? Math.round((completedQuizzes / totalQuizzes) * 100) : 0
-      });
+    const recordPage = async () => {
+      try {
+        await axiosPrivate.post('courses/analytics/track', {
+          activityType: 'course_view',
+          subject: subject,
+        });
+      } catch (err) {
+        console.error('Error recording page view:', err);
+      }
+    };
+    recordPage();
+  },[])
+  
+  useEffect(() => {
+    const getProgress = async () => {
+      try {
+        const response = await axiosPrivate.get(`courses/analytics/progress/${subject}`);
+        console.log(response)
+        if (response.data && typeof response.data.progress === 'number') {
+          setProgress(response.data.progress);
+          
+          // If we have completed items data, calculate percentages based on chapters data
+          if (response.data.completedLessons && chapters.length > 0) {
+            // Count total items from chapters
+            let totalLessons = 0;
+            let totalExercises = 0;
+            let totalQuizzes = 0;
+            
+            chapters.forEach(chapter => {
+              totalLessons += chapter.lessonsCount || 0;
+              totalExercises += chapter.exercisesCount || 0;
+              totalQuizzes += chapter.quizzesCount || 0;
+            });
+            
+            // Get completed counts
+            const completedLessonsCount = response.data.completedLessons.length;
+            const completedExercisesCount = response.data.completedExercises?.length || 0;
+            const completedQuizzesCount = response.data.completedQuizzes?.length || 0;
+            
+            // Calculate percentages
+            const lessonsPercentage = totalLessons > 0 
+              ? Math.round((completedLessonsCount / totalLessons) * 100) 
+              : 0;
+              
+            const exercisesPercentage = totalExercises > 0 
+              ? Math.round((completedExercisesCount / totalExercises) * 100) 
+              : 0;
+              
+            const quizzesPercentage = totalQuizzes > 0 
+              ? Math.round((completedQuizzesCount / totalQuizzes) * 100) 
+              : 0;
+            
+            setProgressData({
+              completedChapters : response.data.completedChapters,
+              lessons: lessonsPercentage,
+              exercises: exercisesPercentage,
+              quizzes: quizzesPercentage,
+              chapterProgress: response.data.chapterProgress,
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching progress:', err);
+      }
+    };
+    
+    // Only fetch progress if we have a subject and chapters are loaded
+    if (subject && chapters.length > 0) {
+      getProgress();
     }
-  }, [currentCourse]);
+  }, [subject, chapters]);
 
-  // Mock course data with chapters structure
-  useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      const mockCourse = {
-        id: courseId,
-        subjectId: subjectId,
-        title: "Mathématiques",
-        description: "Cours complet de mathématiques avec chapitres structurés",
-        progress: 35,
-        difficulty: "Intermédiaire",
-        estimatedTime: "12 heures",
-        lastUpdated: "15 mars 2023",
-        instructor: "Prof. Ahmed Ben Ali",
-        chapters: [
-          {
-            id: 1,
-            title: "Géométrie Euclidienne",
-            progress: 75,
-            description: "Fondements de la géométrie euclidienne et applications",
-            lessons: [
-              { id: 101, title: "Les points et les lignes", completed: true, duration: "15 min", type: "video" },
-              { id: 102, title: "Les angles et les triangles", completed: true, duration: "20 min", type: "interactive" },
-              { id: 103, title: "Les cercles et les polygones", completed: false, duration: "25 min", type: "lecture" },
-            ],
-            exercises: [
-              { id: 201, title: "Calcul d'angles", completed: true, questions: 10, difficulty: "Facile" },
-              { id: 202, title: "Construction de triangles", completed: false, questions: 8, difficulty: "Moyen" },
-            ],
-            quizzes: [
-              { id: 301, title: "Quiz de géométrie", completed: false, questions: 15, time: "20 min", passingScore: 70 },
-            ]
-          },
-          // Other chapters remain the same
-        ]
-      };
+  function handleLessonClick(chapterId, lessonId) {
+    navigate(`/student/courses/${subject}/chapters/${chapterId}/lessons/${lessonId}`);
+  }
+  
+
+
+  // Add fetchChapterLessons function
+  const fetchChapterLessons = async (chapterId) => {
+    // Skip if already loaded
+    if (loadedChapters[chapterId]) return;
+    
+    try {
+      const response = await axiosPrivate.get(`/courses/student/${chapterId}/lessons`);
+      console.log("Fetched chapter data:", response.data);
       
-      setCurrentCourse(mockCourse);
-      setProgress(mockCourse.progress);
-      setLoading(false);
-    }, 1000);
-  }, [courseId, subjectId]);
+      // Check for different possible response structures
+      if (response.data) {
+        let lessonsData = [];
+        
+        // Try to extract lessons from different possible response structures
+        if (response.data.chapter && response.data.chapter.lessons) {
+          lessonsData = response.data.chapter.lessons;
+        } else if (response.data.lessons) {
+          lessonsData = response.data.lessons;
+        } else if (Array.isArray(response.data)) {
+          lessonsData = response.data;
+        }
+        
+        // Update the chapters array with the new data
+        setChapters(prevChapters => 
+          prevChapters.map(chapter => 
+            chapter._id === chapterId 
+              ? { ...chapter, lessons: lessonsData }
+              : chapter
+          )
+        );
+      }
+      
+      // Mark this chapter as loaded regardless of the response structure
+      // This prevents infinite loading state
+      setLoadedChapters(prev => ({ ...prev, [chapterId]: true }));
+      
+    } catch (err) {
+      console.error("Error fetching chapter lessons:", err);
+      // Even on error, mark as loaded to prevent infinite loading state
+      setLoadedChapters(prev => ({ ...prev, [chapterId]: true }));
+    }
+  };
+
+  // Add handleChapterExpand function
+  const handleChapterExpand = (value) => {
+    setExpandedChapter(value);
+    
+    // If a chapter is being expanded (not collapsed), fetch its lessons
+    if (value) {
+      const chapterId = value.replace('chapter-', '');
+      fetchChapterLessons(chapterId);
+    }
+  };
+
+  // Fetch chapters data - fix the API endpoint
+  useEffect(() => {
+    const fetchChapters = async () => {
+      try {
+        setLoading(true);
+        const response = await axiosPrivate.get(`/courses/chapters/${subject}/${auth.user.level}`);
+        
+        if (response.data && response.data.chapters) {
+          const chaptersData = response.data.chapters;
+          setChapters(chaptersData);
+          
+          // Set the first chapter as expanded by default
+          if (chaptersData.length > 0) {
+            setExpandedChapter(`chapter-${chaptersData[0]._id}`);
+            fetchChapterLessons(chaptersData[0]._id);
+          }
+        }
+        setLoading(false);
+      } catch (err) {
+        console.log(err);
+        setLoading(false);
+      }
+    };
+    
+    fetchChapters();
+  }, [subject, auth.user.level]);
 
   if (loading) {
     return (
@@ -122,6 +204,21 @@ function CourseContent() {
     );
   }
 
+  if (chapters.length === 0) {
+    return (
+      <div className="container mx-auto p-6">
+        <Link to="/student/courses" className="text-primary hover:underline flex items-center mb-4">
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Retour aux cours
+        </Link>
+        <div className="text-center p-12">
+          <h2 className="text-2xl font-semibold mb-2">Aucun chapitre disponible</h2>
+          <p className="text-muted-foreground">Il n'y a pas encore de contenu pour ce sujet.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto p-6">
       {/* Course Header */}
@@ -133,8 +230,8 @@ function CourseContent() {
         
         <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
           <div>
-            <h1 className="text-3xl font-bold mb-2">{currentCourse.title}</h1>
-            <p className="text-muted-foreground mb-4">{currentCourse.description}</p>
+            <h1 className="text-3xl font-bold mb-2">{subject}</h1>
+            <p className="text-muted-foreground mb-4">Cours de {subject} pour {auth.user.level}</p>
             
             <div className="flex items-center mb-4">
               <Progress value={progress} className="h-2 w-48 mr-4" />
@@ -147,15 +244,15 @@ function CourseContent() {
             <div className="space-y-2 text-sm">
               <div className="flex items-center">
                 <BarChart2 className="h-4 w-4 mr-2 text-muted-foreground" />
-                <span>Difficulté: {currentCourse.difficulty}</span>
+                <span>Difficulté: {chapters[0]?.difficulty || 'N/A'}</span>
               </div>
               <div className="flex items-center">
                 <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
-                <span>Durée estimée: {currentCourse.estimatedTime}</span>
+                <span>Durée estimée: {chapters.reduce((total, chapter) => total + (chapter.totalTime || 0), 0)} minutes</span>
               </div>
               <div className="flex items-center">
                 <BookMarked className="h-4 w-4 mr-2 text-muted-foreground" />
-                <span>Instructeur: {currentCourse.instructor}</span>
+                <span>Niveau: {auth.user.level}</span>
               </div>
             </div>
           </div>
@@ -167,21 +264,21 @@ function CourseContent() {
             <div className="flex justify-center mb-1">
               <BookOpen className="h-5 w-5 text-primary" />
             </div>
-            <div className="text-xl font-bold">{completedItems.lessons}%</div>
+            <div className="text-xl font-bold">{progressData.lessons}%</div>
             <div className="text-xs text-muted-foreground">Leçons complétées</div>
           </div>
           <div className="bg-primary/5 rounded-lg p-3 text-center">
             <div className="flex justify-center mb-1">
               <FileText className="h-5 w-5 text-primary" />
             </div>
-            <div className="text-xl font-bold">{completedItems.exercises}%</div>
+            <div className="text-xl font-bold">{progressData.exercises}%</div>
             <div className="text-xs text-muted-foreground">Exercices complétés</div>
           </div>
           <div className="bg-primary/5 rounded-lg p-3 text-center">
             <div className="flex justify-center mb-1">
               <Award className="h-5 w-5 text-primary" />
             </div>
-            <div className="text-xl font-bold">{completedItems.quizzes}%</div>
+            <div className="text-xl font-bold">{progressData.quizzes}%</div>
             <div className="text-xs text-muted-foreground">Quiz complétés</div>
           </div>
         </div>
@@ -192,187 +289,129 @@ function CourseContent() {
       {/* Chapters Accordion */}
       <div className="mb-8">
         <h2 className="text-2xl font-semibold mb-4">Chapitres du cours</h2>
-        <Accordion type="single" collapsible className="w-full" value={expandedChapter} onValueChange={setExpandedChapter}>
-          {currentCourse.chapters.map((chapter) => (
-            <AccordionItem key={chapter.id} value={`chapter-${chapter.id}`} className="border rounded-lg mb-4 overflow-hidden">
+        <Accordion 
+          type="single" 
+          collapsible 
+          className="w-full" 
+          value={expandedChapter} 
+          onValueChange={handleChapterExpand}
+        >
+          {chapters.map((chapter) => (
+            <AccordionItem key={chapter._id} value={`chapter-${chapter._id}`} className="border rounded-lg mb-4 overflow-hidden">
               <AccordionTrigger className="hover:bg-muted/50 px-4 py-3 rounded-t-lg">
                 <div className="flex items-center justify-between w-full pr-4">
                   <div className="flex items-center">
                     <span className="font-medium">{chapter.title}</span>
-                    {chapter.progress === 100 && (
+                    {progressData.completedChapters.includes(chapter._id) && (
                       <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-200">
                         <CheckCircle className="h-3 w-3 mr-1" /> Complété
                       </Badge>
                     )}
                   </div>
                   <div className="flex items-center">
-                    <Progress value={chapter.progress} className="h-2 w-24 mr-2" />
-                    <span className="text-xs text-muted-foreground">{chapter.progress}%</span>
+                    <Progress 
+                      value={
+                        progressData?.chapterProgress?.find(cp => cp.chapterId === chapter._id)?.progress || 0
+                      } 
+                      className="h-2 w-24 mr-2" 
+                    />
+                    <span className="text-xs text-muted-foreground">
+                      {progressData?.chapterProgress?.find(cp => cp.chapterId === chapter._id)?.progress || 0}%
+                    </span>
                   </div>
                 </div>
               </AccordionTrigger>
               <AccordionContent className="px-4 pb-4 pt-2 bg-card/50">
-                {chapter.description && (
-                  <p className="text-sm text-muted-foreground mb-4">{chapter.description}</p>
-                )}
+                {!loadedChapters[chapter._id] ? (
+                  <div className="flex justify-center p-4">
+                    <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
+                  </div>
+                ) : (
+                  <>
+                    {chapter.description && (
+                      <p className="text-sm text-muted-foreground mb-4">{chapter.description}</p>
+                    )}
                 
-                <Tabs defaultValue="lessons" className="mt-2">
-                  <TabsList className="grid grid-cols-3 mb-4">
-                    <TabsTrigger value="lessons" className="text-xs">
-                      <BookOpen className="h-3 w-3 mr-1" />
-                      Leçons ({chapter.lessons.length})
-                    </TabsTrigger>
-                    <TabsTrigger value="exercises" className="text-xs">
-                      <FileText className="h-3 w-3 mr-1" />
-                      Exercices ({chapter.exercises.length})
-                    </TabsTrigger>
-                    <TabsTrigger value="quizzes" className="text-xs">
-                      <Award className="h-3 w-3 mr-1" />
-                      Quiz ({chapter.quizzes.length})
-                    </TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="lessons" className="space-y-2">
-                    {chapter.lessons.map((lesson) => (
-                      <Card key={lesson.id} className={`${lesson.completed ? 'border-primary/20 bg-primary/5' : ''} hover:shadow-sm transition-shadow`}>
-                        <CardHeader className="p-3">
-                          <div className="flex justify-between items-center">
-                            <div className="flex items-center">
-                              <CardTitle className="text-sm">
-                                {lesson.title}
-                              </CardTitle>
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Badge variant="outline" className="ml-2 text-xs">
-                                      {lesson.type === "video" && "Vidéo"}
-                                      {lesson.type === "interactive" && "Interactif"}
-                                      {lesson.type === "lecture" && "Lecture"}
-                                    </Badge>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>Type de leçon: {lesson.type}</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            </div>
-                            {lesson.completed && (
-                              <CheckCircle className="h-4 w-4 text-primary" />
-                            )}
+                    {/* Lessons section */}
+                    <div className="mt-2">
+                      <div className="flex items-center mb-4">
+                        <BookOpen className="h-4 w-4 mr-2 text-primary" />
+                        <h3 className="font-medium text-sm">Leçons ({chapter.lessonsCount || 0})</h3>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        {chapter.lessons && chapter.lessons.length > 0 ? (
+                          chapter.lessons.map((lesson) => (
+                            <Card key={lesson._id} className={`${lesson.completed ? 'border-primary/20 bg-primary/5' : ''} hover:shadow-sm transition-shadow`}>
+                              <CardHeader className="p-3">
+                                <div className="flex justify-between items-center">
+                                  <div className="flex items-center">
+                                    <CardTitle className="text-sm">
+                                      {lesson.title}
+                                    </CardTitle>
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Badge variant="outline" className="ml-2 text-xs">
+                                            {lesson.contentType === "video" && "Vidéo"}
+                                            {lesson.contentType === "text" && "Lecture"}
+                                          </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>Type de leçon: {lesson.contentType}</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  </div>
+                                  {lesson.completed && (
+                                    <CheckCircle className="h-4 w-4 text-primary" />
+                                  )}
+                                </div>
+                                <CardDescription className="text-xs flex items-center">
+                                  <Clock className="h-3 w-3 mr-1" /> Durée: {lesson.estimatedTime} min
+                                </CardDescription>
+                                {/* Statistics for exercises and quizzes */}
+                                <div className="flex gap-3 mt-2 text-xs text-muted-foreground">
+                                  {(lesson.exercises && lesson.exercises.length > 0) && (
+                                    <span className="flex items-center">
+                                      <FileText className="h-3 w-3 mr-1" /> 
+                                      {lesson.exercises.length} exercice{lesson.exercises.length > 1 ? 's' : ''}
+                                    </span>
+                                  )}
+                                  {(lesson.quizzes && lesson.quizzes.length > 0) && (
+                                    <span className="flex items-center">
+                                      <Award className="h-3 w-3 mr-1" /> 
+                                      {lesson.quizzes.length} quiz{lesson.quizzes.length > 1 ? 'zes' : ''}
+                                    </span>
+                                  )}
+                                </div>
+                              </CardHeader>
+                              <CardFooter className="p-3 pt-0">
+                                <Button 
+                                  size="sm" 
+                                  className="w-full text-xs" 
+                                  onClick={() => handleLessonClick(chapter._id, lesson._id)} 
+                                  variant={lesson.completed ? "outline" : "default"}
+                                >
+                                  {lesson.completed ? 'Revoir' : 'Commencer'}
+                                  <Play className="h-3 w-3 ml-1" />
+                                </Button>
+                              </CardFooter>
+                            </Card>
+                          ))
+                        ) : (
+                          <div className="text-center p-4 text-muted-foreground text-sm">
+                            Aucune leçon disponible pour ce chapitre.
                           </div>
-                          <CardDescription className="text-xs flex items-center">
-                            <Clock className="h-3 w-3 mr-1" /> Durée: {lesson.duration}
-                          </CardDescription>
-                        </CardHeader>
-                        <CardFooter className="p-3 pt-0">
-                          <Button 
-                            size="sm" 
-                            className="w-full text-xs" 
-                            onClick={() => handleLessonClick(chapter.id, lesson.id)} 
-                            variant={lesson.completed ? "outline" : "default"}
-                          >
-                            {lesson.completed ? 'Revoir' : 'Commencer'}
-                            <Play className="h-3 w-3 ml-1" />
-                          </Button>
-                        </CardFooter>
-                      </Card>
-                    ))}
-                  </TabsContent>
-
-                  <TabsContent value="exercises" className="space-y-2">
-                    {chapter.exercises.map((exercise) => (
-                      <Card key={exercise.id} className={`${exercise.completed ? 'border-primary/20 bg-primary/5' : ''} hover:shadow-sm transition-shadow`}>
-                        <CardHeader className="p-3">
-                          <div className="flex justify-between items-center">
-                            <div className="flex items-center">
-                              <CardTitle className="text-sm">
-                                {exercise.title}
-                              </CardTitle>
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Badge variant="outline" className={`ml-2 text-xs ${
-                                      exercise.difficulty === "Facile" ? "bg-green-50 text-green-700 border-green-200" :
-                                      exercise.difficulty === "Moyen" ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
-                                      "bg-red-50 text-red-700 border-red-200"
-                                    }`}>
-                                      {exercise.difficulty}
-                                    </Badge>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>Niveau de difficulté: {exercise.difficulty}</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            </div>
-                            {exercise.completed && (
-                              <CheckCircle className="h-4 w-4 text-primary" />
-                            )}
-                          </div>
-                          <CardDescription className="text-xs flex items-center">
-                            <FileText className="h-3 w-3 mr-1" /> {exercise.questions} questions
-                          </CardDescription>
-                        </CardHeader>
-                        <CardFooter className="p-3 pt-0">
-                          <Button 
-                            size="sm" 
-                            className="w-full text-xs" 
-                            onClick={() => handleExerciseClick(chapter.id, exercise.id)} 
-                            variant={exercise.completed ? "outline" : "default"}
-                          >
-                            {exercise.completed ? 'Refaire' : 'Commencer'}
-                            <Play className="h-3 w-3 ml-1" />
-                          </Button>
-                        </CardFooter>
-                      </Card>
-                    ))}
-                  </TabsContent>
-
-                  <TabsContent value="quizzes" className="space-y-2">
-                    {chapter.quizzes.map((quiz) => (
-                      <Card key={quiz.id} className={`${quiz.completed ? 'border-primary/20 bg-primary/5' : ''} hover:shadow-sm transition-shadow`}>
-                        <CardHeader className="p-3">
-                          <div className="flex justify-between items-center">
-                            <div className="flex items-center">
-                              <CardTitle className="text-sm">
-                                {quiz.title}
-                              </CardTitle>
-                              <Badge variant="outline" className="ml-2 text-xs bg-blue-50 text-blue-700 border-blue-200">
-                                {quiz.questions} questions
-                              </Badge>
-                            </div>
-                            {quiz.completed && (
-                              <CheckCircle className="h-4 w-4 text-primary" />
-                            )}
-                          </div>
-                          <CardDescription className="text-xs flex flex-wrap gap-2">
-                            <span className="flex items-center">
-                              <Clock className="h-3 w-3 mr-1" /> Durée: {quiz.time}
-                            </span>
-                            <span className="flex items-center">
-                              <Award className="h-3 w-3 mr-1" /> Score minimum: {quiz.passingScore}%
-                            </span>
-                          </CardDescription>
-                        </CardHeader>
-                        <CardFooter className="p-3 pt-0">
-                          <Button 
-                            size="sm" 
-                            className="w-full text-xs" 
-                            onClick={() => handleQuizClick(chapter.id, quiz.id)} 
-                            variant={quiz.completed ? "outline" : "default"}
-                          >
-                            {quiz.completed ? 'Revoir' : 'Commencer'}
-                            <Play className="h-3 w-3 ml-1" />
-                          </Button>
-                        </CardFooter>
-                      </Card>
-                    ))}
-                  </TabsContent>
-                </Tabs>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
               </AccordionContent>
             </AccordionItem>
-          ))}
-        </Accordion>
+            ))}
+          </Accordion>
       </div>
     </div>
   )
