@@ -18,6 +18,7 @@ export const verifyToken = async (req, res, next) => {
                 req.headers['x-user-id'] = decoded.id;
                 req.headers['x-user-email'] = decoded.email;
                 req.headers['x-user-role'] = decoded.role;
+                req.headers['x-user-name'] = decoded.username;
                 if (decoded.level) req.headers['x-user-level'] = decoded.level;
                 next();
             }

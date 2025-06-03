@@ -8,14 +8,14 @@ import { Input } from '@/components/ui/input';
 import { Button } from './ui/button';
 
 function LoginForm() {
-    const { setAuth } = useAuth();
+    const { setAuth,auth } = useAuth();
     const [error, setError] = useState('');
     const [formErrors, setFormErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
-    const from = location.state?.from?.pathname || "/";
-
+    const from = location.state?.from?.pathname;
+    console.log("auth" , auth)
     const validateForm = (data) => {
         const errors = {};
         if (!data.email) errors.email = 'Email is required';
@@ -49,51 +49,43 @@ function LoginForm() {
             setIsSubmitting(true);
             const data = Object.fromEntries(formData);
             const errors = validateForm(data);
+    
             if (Object.keys(errors).length > 0) {
                 setFormErrors(errors);
                 setIsSubmitting(false);
                 return;
             }
+    
             setFormErrors({});
-
+    
             const res = await axiosPublic.post('/auth/login', data);
             const accessToken = res?.data?.accessToken;
             const user = res?.data?.user;
-            
-            // Update auth context
+    
             setAuth({ user, accessToken });
-            
+    
             toast.success('Login successful!');
-            
-            // Determine redirect path based on user role
-            let redirectPath;
-            
-            if (from && from !== "/") {
-                redirectPath = from;
-            } else if (user?.role) {
-                // Role-based routing
-                switch(user.role.toLowerCase()) {
-                    case 'admin':
-                        redirectPath = '/admin';
-                        break;
-                    case 'teacher':
-                        redirectPath = '/teacher';
-                        break;
-                    case 'student':
-                        redirectPath = '/student';
-                        break;
-                    default:
-                        redirectPath = '/login';
-                }
-            } else {
-                redirectPath = '/login';
+    
+            // Role-based redirect only
+            let redirectPath = '/login'; // fallback
+            switch (user?.role?.toLowerCase()) {
+                case 'admin':
+                    redirectPath = '/admin';
+                    break;
+                case 'teacher':
+                    redirectPath = '/teacher';
+                    break;
+                case 'student':
+                    redirectPath = '/student';
+                    break;
+                default:
+                    return; // stop here if role is invalid
             }
-            
-            // Navigate after a short delay to ensure toast is visible
+    
             setTimeout(() => {
                 navigate(redirectPath, { replace: true });
-            }, 500);
-            
+            }, 500); // optional delay to allow toast to show
+    
         } catch (error) {
             const errorMessage = error.response?.data?.message || 'Login failed';
             toast.error(errorMessage);

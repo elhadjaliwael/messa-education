@@ -4,7 +4,8 @@ export const extractInfo = (req,res,next) => {
             id: req.headers['x-user-id'],
             email: req.headers['x-user-email'],
             role: req.headers['x-user-role'],
-            level: req.headers['x-user-level']
+            level: req.headers['x-user-level'],
+            name : req.headers['x-user-name']
         };
         next();
     } catch (error) {

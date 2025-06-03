@@ -10,12 +10,17 @@ import helmet from 'helmet';
 import cors from 'cors';
 import http from 'http';
 
-const upgradeGateway = (req, socket, head) => {
+const upgradeGateway = async (req, socket, head) => {
   const { pathname } = new URL(req.url, `http://${req.headers.host}`);
   console.log('Upgrade path:', pathname);
 
-  let target = null;
+  // Add socket error handling early
+  socket.on('error', (err) => {
+    console.error('Socket error in upgrade handler:', err);
+  });
 
+
+  let target = null;
   if (pathname.startsWith('/api/chat/chat-socket')) {
     target = 'http://localhost:3003';
   } else if (pathname.startsWith('/api/notifications/notification-socket')) {
@@ -28,9 +33,22 @@ const upgradeGateway = (req, socket, head) => {
       changeOrigin: true,
       ws: true,
       logger: console,
+      onError: (err, req, socket) => {
+        console.error('Proxy WebSocket error:', err);
+        if (socket && !socket.destroyed) {
+          socket.destroy();
+        }
+      }
     });
 
-    proxy.upgrade(req, socket, head);
+    try {
+      proxy.upgrade(req, socket, head);
+    } catch (error) {
+      console.error('Error during proxy upgrade:', error);
+      if (!socket.destroyed) {
+        socket.destroy();
+      }
+    }
   } else {
     console.warn('No WS target found, destroying socket');
     socket.destroy();
@@ -59,29 +77,6 @@ app.use(xss());
 app.use(helmet());
 app.use(limiter);
 
-const createWsProxy = (targetUrl) => createProxyMiddleware({
-  target: targetUrl,
-  changeOrigin: true,
-  ws: true,
-  logger: console,
-  on: {
-    proxyReqWs: (proxyReq, req, socket) => {
-      if (req.headers.authorization) {
-        proxyReq.setHeader('authorization', req.headers.authorization);
-      }
-      socket.on('error', (err) => {
-        console.error('WebSocket proxy error:', err);
-      });
-    },
-    error: (err, req, res) => {
-      console.error('Proxy error:', err);
-      if (res && typeof res.writeHead === 'function') {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Internal proxy error' }));
-      }
-    }
-  }
-});
 
 app.use('/api/auth', createProxyMiddleware({
   target: `${services.auth.url}/api/auth`,

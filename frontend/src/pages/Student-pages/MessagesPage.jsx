@@ -36,9 +36,6 @@ export default function MessagesPage() {
               const teacherClasses = teacherProfile.data.classes || [];
               // Create contact groups based on subjects and classes
               const contactGroups = [];
-              console.log("teacherProfile",teacherProfile)
-              console.log("teacherClasses",teacherClasses)
-              console.log("teacherSubject",teacherSubject)
               for (const classLevel of teacherClasses) {
                 // Get subjects for this class level
                 const classSubjects = classes[classLevel] || [];
@@ -47,7 +44,6 @@ export default function MessagesPage() {
                 const subjectObj = classSubjects.find(subject => 
                   subject.name === teacherSubject
                 );
-                console.log("subjectObj",subjectObj)
                 if (subjectObj) {
                   // Get students for this class
                   const studentsResponse = await axiosPrivate.get(`/auth/students/by-class/${classLevel}`);
@@ -86,7 +82,6 @@ export default function MessagesPage() {
                   });
                 }
               }
-              console.log("contactGroups",contactGroups)
               setContacts(contactGroups);
             } else {
               // For students: Get their class level and create groups for each subject

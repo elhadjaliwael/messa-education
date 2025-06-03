@@ -60,6 +60,7 @@ function AdminCoursesPage() {
         const formattedCourses = response.data.chapters.map((chapter, index) => ({
           id: chapter._id,
           title: chapter.title,
+          addedByName: chapter.addedByName,
           subject: chapter.subject,
           grade: chapter.classLevel,
           order: ((currentPage - 1) * itemsPerPage) + index + 1,
@@ -80,6 +81,7 @@ function AdminCoursesPage() {
         const formattedCourses = Array.isArray(response.data) ? response.data.map((chapter, index) => ({
           id: chapter._id,
           title: chapter.title || chapter.subject,
+          addedByName: chapter.addedByName,
           subject: chapter.subject,
           grade: chapter.classLevel,
           order: index + 1,

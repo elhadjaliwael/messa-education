@@ -15,31 +15,31 @@ function TeacherDashboard() {
   const socketsInitialized = useRef(false);
   
   useEffect(() => {
-    if (!auth?.accessToken) return;
-
-    // Initialize sockets if not already initialized
+    if (!auth?.accessToken || !auth.user?.id) return;
+  
     if (!socketsInitialized.current) {
       const msgSocket = initializeSocket(auth);
       const notifSocket = initializeNotificationSocket(auth);
+      notifSocket.connect(); // now safe
+      msgSocket.connect(); // now safe
       setupNotificationSocket(notifSocket);
+  
       socketsInitialized.current = true;
     }
-
-    // Cleanup on unmount or refresh
+  
     const handleBeforeUnload = () => {
       disconnectMessageSocket();
       disconnectNotificationSocket();
       socketsInitialized.current = false;
     };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
+  
+    window.addEventListener("beforeunload", handleBeforeUnload);
+  
     return () => {
-      // Cleanup on component unmount
       handleBeforeUnload();
-      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
     };
-  }, [auth?.accessToken, initializeSocket, initializeNotificationSocket, setupNotificationSocket, disconnectMessageSocket, disconnectNotificationSocket]);
+  }, [auth?.accessToken, auth?.user?.id]);
   return (
     <SidebarProvider>
     <div className="flex h-screen w-full bg-background">

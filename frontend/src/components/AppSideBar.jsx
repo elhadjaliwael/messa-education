@@ -19,7 +19,7 @@ import {
     SidebarMenuItem,
   } from "@/components/ui/sidebar"
   import useAuth from "../hooks/useAuth"
-  import { useNavigate } from "react-router-dom"
+
   
   export default function AppSidebar({ role = "student", ...props }) {
     const { user, logout } = useAuth()

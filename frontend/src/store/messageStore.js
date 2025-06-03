@@ -25,7 +25,7 @@ const useMessageStore = create((set, get) => ({
       socket.disconnect();
     }
 
-    const newSocket = io("http://localhost:8000/", {
+    const newSocket = io("http://localhost:3003/", {
       path: "/api/chat/chat-socket",
       withCredentials: true,
       transports: ['websocket'],

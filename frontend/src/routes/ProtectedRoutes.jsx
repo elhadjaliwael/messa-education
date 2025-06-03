@@ -3,18 +3,14 @@ import useAuth from '../hooks/useAuth';
 
 export const ProtectedRoute = ({ allowedRoles }) => {
     const { auth, loading } = useAuth();
-    const location = useLocation();
-    
-    // Show loading state while checking authentication
-    if (loading) {
-        return <div>Loading...</div>;
-    }
-    
-    return (
-        auth?.user && auth?.accessToken && allowedRoles?.includes(auth?.user?.role)
+
+    if (loading) return <div>Loading...</div>;
+
+    if (auth?.user && auth?.accessToken) {
+        return allowedRoles?.includes(auth.user.role)
             ? <Outlet />
-            : auth?.user
-                ? <Navigate to="/unauthorized" state={{ from: location }} replace />
-                : <Navigate to="/login" state={{ from: location }} replace />
-    );
+            : <Navigate to="/unauthorized" replace />;
+    }
+
+    return <Navigate to="/login" replace />;
 };

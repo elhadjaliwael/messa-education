@@ -2,129 +2,18 @@ import {Chapter, Lesson } from '../models/course.js';
 import Assignment from '../models/assignments.js';
 import { notifyCourseCreated, notifyNewCourseFromTeacher } from '../services/rabbitmq.service.js';
 import { notifyAssignmentCreated } from '../services/rabbitmq.service.js';
-export const createCourse = async (req, res) => {
-  try {
-    const course = new Course(req.body);
-    await course.save();
-    res.status(201).json({message : 'Course created successfully', courseId: course._id});
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-}
-
-export const getAllCourses = async (req, res) => {
-  try {
-    // Parse pagination parameters from query string
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
-    
-    // Count total documents for pagination metadata
-    const total = await Course.countDocuments();
-    
-    // Get courses with pagination
-    const courses = await Course.find()
-      .skip(skip)
-      .limit(limit);
-    
-    // Calculate pagination metadata
-    const totalPages = Math.ceil(total / limit);
-    const hasNext = page < totalPages;
-    const hasPrev = page > 1;
-    
-    res.status(200).json({
-      courses,
-      pagination: {
-        total,
-        page,
-        limit,
-        totalPages,
-        hasNext,
-        hasPrev
-      }
-    });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-}
-
-export const getCourseById = async (req, res) => {
-  try {
-    const course = await Course.findById(req.params.courseId);
-    if (!course) {
-      return res.status(404).json({ message: 'Course not found' });
-    }
-    
-    // Get all chapters for this course
-    const chapters = await Chapter.find({ courseId: course._id }).sort({ order: 1 });
-    
-    // For each chapter, get its lessons
-    const chaptersWithLessons = await Promise.all(chapters.map(async (chapter) => {
-      const lessons = await Lesson.find({ chapterId: chapter._id }).sort({ order: 1 });
-      return {
-        ...chapter.toObject(),
-        lessons
-      };
-    }));
-    
-    // Add chapters to course response
-    const courseWithChapters = {
-      ...course.toObject(),
-      chapters: chaptersWithLessons
-    };
-    
-    res.status(200).json({message: 'Course found successfully', course: courseWithChapters});
-  } catch (error) { 
-    res.status(400).json({ error: error.message });
-  } 
-}
-
-export const updateCourse = async (req, res) => {
-  try {
-    const course = await Course.findById(req.params.courseId);
-    const {subject, classLevel, description, difficulty} = req.body;
-    
-    if (!course) {
-      return res.status(404).json({ message: 'Course not found' });
-    } 
-    
-    course.subject = subject;
-    course.classLevel = classLevel;
-    course.description = description;
-    course.difficulty = difficulty;
-    await course.save();
-    
-    res.status(200).json({message: 'Course updated successfully'});
-  } 
-  catch (error) {
-    res.status(400).json({ error: error.message }); 
-  }
-}
-
-export const togglePublish = async (req, res) => {
-  try {
-    const course = await Course.findById(req.params.courseId);
-    if (!course) {
-      return res.status(404).json({ message: 'Course not found' });
-    } 
-    course.isPublished = !course.isPublished;
-    await course.save();
-    res.status(200).json({message: `Course ${course.isPublished ? 'Published' : 'Unpublished'} successfully`});
-  } 
-  catch (error) {
-    res.status(400).json({ error: error.message }); 
-  }
-}
 
 // Chapter controllers
 // Renamed from createCourse to createChapter
 export const createChapter = async (req, res) => {
   try {
-    const addedBy = req.user.id
-    req.body.addedBy = addedBy;
+    const addedById = req.user.id
+    const addedByName = req.user.role === "teacher" ? req.user.name : "Admin"
+    req.body.addedById = addedById;
+    req.body.addedByName = addedByName;
     const chapter = new Chapter(req.body);
     await chapter.save();
-    if(req.body.role === "teacher"){
+    if(req.user.role === "teacher"){
       await notifyNewCourseFromTeacher(chapter)
     }
     if(chapter.isPublished){
@@ -141,11 +30,11 @@ export const createChapter = async (req, res) => {
 export const getAllChapters = async (req, res) => {
   try {
     // Parse pagination parameters from query string
-    const addedBy = req.user.id
+    const addedById = req.user.id
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
-    const query = req.user.role === 'teacher' ? {addedBy} : {};
+    const query = req.user.role === 'teacher' ? {addedById} : {};
 
     const total = await Chapter.countDocuments(query); // Count total documents for pagination metadata
     // Get chapters with pagination

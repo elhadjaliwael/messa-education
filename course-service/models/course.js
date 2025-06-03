@@ -119,10 +119,13 @@ const LessonSchema = new mongoose.Schema({
 
 // Chapter schema - now includes course properties
 const ChapterSchema = new mongoose.Schema({
-  addedBy : {
+  addedById : {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
+  },
+  addedByName : {
+    type: String,
   },
   title: {
     type: String,

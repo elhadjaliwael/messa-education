@@ -5,7 +5,6 @@ const userSchema = new mongoose.Schema({
   username: {
     type: String,
     required: true,
-    unique: true,
     trim: true,
     minlength: 3
   },
@@ -45,7 +44,6 @@ const userSchema = new mongoose.Schema({
   },
   phoneNumber : {
     type: String,
-    unique: true,
     trim: true,
     minlength: 8
   },
@@ -64,7 +62,21 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   }],
-  
+  cin : {
+    type: String,
+    trim: true,
+    minlength: 8
+  },
+  etablissement : {
+    type: String,
+    trim: true,
+    minlength: 3
+  },
+  address : {
+    type: String,
+    trim: true,
+    minlength: 3
+  },
   // Add this field to your schema
   tempPassword: {
     type: String,

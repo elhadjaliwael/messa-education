@@ -74,6 +74,7 @@ export const notifyAssignmentCreated = async (assignment) => {
   });
 };
 export const notifyNewCourseFromTeacher = async (chapter) => {
+
   return sendNotification({
     type: 'NEW_COURSE_FROM_TEACHER',
     title: 'New Course Available',
@@ -82,6 +83,10 @@ export const notifyNewCourseFromTeacher = async (chapter) => {
     data: {
       courseId: chapter._id,
       chapterName: chapter.title,
+      addedBy : {
+        id : chapter.addedById,
+        name : chapter.addedByName
+      }
     }
   })
 }

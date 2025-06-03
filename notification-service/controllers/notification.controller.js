@@ -19,9 +19,8 @@ export const createNotification = async (msg) => {
       sendEmail(data.email, title, message)
       return { success: true };
     }
-    
     // If targetUsers is 'all', notify all users
-    if (targetUsers === 'all' || targetUsers === 'admin') {
+    if (targetUsers === 'students' || targetUsers === 'admin' || targetUsers === 'teachers') {
       // Replace HTTP request with RabbitMQ message
       const users = await publishMessage('auth.get.students', {targetUsers});
       console.log('Retrieved users:', users.length);

@@ -42,6 +42,7 @@ function ChaptersTable({
                         <TableHead className="w-[50px]">#</TableHead>
                         <TableHead>Subject</TableHead>
                         <TableHead>Grade</TableHead>
+                        <TableHead className="text-center">Added By</TableHead>
                         <TableHead className="text-center">Lessons</TableHead>
                         <TableHead className="text-center">Exercises</TableHead>
                         <TableHead className="text-center">Quizzes</TableHead>
@@ -62,6 +63,7 @@ function ChaptersTable({
                             <TableCell className="font-medium">{course.order}</TableCell>
                             <TableCell className="font-medium">{course.subject}</TableCell>
                             <TableCell>{course.grade}</TableCell>
+                            <TableCell className="text-center">{course.addedByName ? course.addedByName : "N/A"}</TableCell>
                             <TableCell className="text-center">{course.lessons || 0}</TableCell>
                             <TableCell className="text-center">{course.exercices || 0}</TableCell>
                             <TableCell className="text-center">{course.quizzes || 0}</TableCell>
