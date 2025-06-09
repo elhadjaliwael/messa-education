@@ -33,8 +33,6 @@ export const sendNotification = async (notificationData) => {
       Buffer.from(JSON.stringify(notificationData)),
       { persistent: true }
     );
-    
-    console.log('Notification sent to queue:', notificationData.title);
     return true;
   } catch (error) {
     console.error('Error sending notification:', error);
@@ -43,53 +41,102 @@ export const sendNotification = async (notificationData) => {
 };
 
 // Example helper function to send course notifications
-export const notifyCourseCreated = async (chapter, targetUsers = 'all') => {
-  return sendNotification({
-    type: 'COURSE_UPDATE', // Using one of the enum values from the schema
+// Notification templates configuration
+const NOTIFICATION_TEMPLATES = {
+  COURSE_UPDATE: {
     title: 'New Chapter Available',
-    message: `A new chapter "${chapter.title}" has been added to the platform.`,
-    targetUsers, // This should be a user ID or 'all'
-    data: {
+    message: (data) => `A new chapter "${data.title}" has been added to the platform.`,
+    targetUsers: "student",
+    dataMapper: (chapter) => ({
       courseId: chapter._id,
+      classLevel: chapter.classLevel,
       chapterName: chapter.title,
       link: `/courses/${chapter.courseId}/chapters/${chapter._id}`
-    }
-  });
-};
-
-// Example helper function to send assignment notifications
-export const notifyAssignmentCreated = async (assignment) => {
-  const link = assignment.exercise ? `courses/${assignment.subject.name}/chapters/${assignment.chapter.id}/lessons/${assignment.lesson.id}/exercises/${assignment.exercise.id}` :
-    `courses/${assignment.subject.name}/chapters/${assignment.chapter.id}/lessons/${assignment.lesson.id}/quizzes/${assignment.quizz.id}` 
-  return sendNotification({
-    type: 'NEW_ASSIGNMENT',
+    })
+  },
+  
+  NEW_ASSIGNMENT: {
     title: 'New Assignment',
-    message: `A new assignment has been added to the course "${assignment.subject.name}".`,
-    targetUsers: [assignment.userId],
-    data: {
-      assignmentId: assignment._id,
-      dueDate: assignment.dueDate,
-      link: link,
+    message: (data) => `A new assignment has been added to the course "${data.subject.name}".`,
+    targetUsers: (assignment) => [assignment.userId],
+    dataMapper: (assignment) => {
+      const link = assignment.exercise 
+        ? `courses/${assignment.subject.name}/chapters/${assignment.chapter.id}/lessons/${assignment.lesson.id}/exercises/${assignment.exercise.id}`
+        : `courses/${assignment.subject.name}/chapters/${assignment.chapter.id}/lessons/${assignment.lesson.id}/quizzes/${assignment.quizz.id}`;
+      
+      return {
+        assignmentId: assignment._id,
+        dueDate: assignment.dueDate,
+        link: link
+      };
     }
-  });
-};
-export const notifyNewCourseFromTeacher = async (chapter) => {
-
-  return sendNotification({
-    type: 'NEW_COURSE_FROM_TEACHER',
+  },
+  
+  NEW_COURSE_FROM_TEACHER: {
     title: 'New Course Available',
-    message: `A new course "${chapter.title}" has been added to the platform.`,
-    targetUsers: 'admin', // This should be a user ID or 'all'
-    data: {
+    message: (data) => `A new course "${data.title}" has been added by ${data.addedByName} to the platform.`,
+    targetUsers: 'admin',
+    dataMapper: (chapter) => ({
       courseId: chapter._id,
       chapterName: chapter.title,
-      addedBy : {
-        id : chapter.addedById,
-        name : chapter.addedByName
+      addedBy: {
+        id: chapter.addedById,
+        name: chapter.addedByName
       }
-    }
-  })
-}
+    })
+  },
+  
+  ASSIGNMENT_COMPLETED: {
+    title: 'Assignment Completed',
+    message: (data) => `Ton enfant a bien complété l'exercice "${data.quizz.title || data.exercise.title}"`,
+    targetUsers: (assignment) => [assignment.parentId],
+    dataMapper: (assignment) => assignment
+  }
+};
+
+// Dynamic notification sender
+export const sendDynamicNotification = async (type, sourceData) => {
+  const template = NOTIFICATION_TEMPLATES[type];
+  
+  if (!template) {
+    throw new Error(`Unknown notification type: ${type}`);
+  }
+  
+  // Resolve target users (can be function or static value)
+  const targetUsers = typeof template.targetUsers === 'function' 
+    ? template.targetUsers(sourceData)
+    : template.targetUsers;
+   
+  // Map source data using the template's data mapper
+  const mappedData = template.dataMapper(sourceData);
+  // Generate message using template function
+  const message = template.message(sourceData);
+  const notificationPayload = { 
+    type,
+    title: template.title,
+    message,
+    targetUsers,
+    data: mappedData
+  }
+  return sendNotification(notificationPayload);
+};
+
+// Simplified wrapper functions (optional - for backward compatibility)
+export const notifyCourseCreated = async (chapter, targetUsers = 'all') => {
+  return sendDynamicNotification('COURSE_UPDATE', chapter);
+};
+
+export const notifyAssignmentCreated = async (assignment) => {
+  return sendDynamicNotification('NEW_ASSIGNMENT', assignment);
+};
+
+export const notifyNewCourseFromTeacher = async (chapter) => {
+  return sendDynamicNotification('NEW_COURSE_FROM_TEACHER', chapter);
+};
+
+export const notifyAssignmentCompleted = async (assignment) => {
+  return sendDynamicNotification('ASSIGNMENT_COMPLETED', assignment);
+};
 
 // Close connection when service shuts down
 export const closeRabbitMQ = async () => {

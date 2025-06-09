@@ -40,7 +40,8 @@ export function MyBarChart({data}) {
             />
             <Bar dataKey="teachers" fill="#00C49F" radius={4} name="Teachers" />
             <Bar dataKey="students" fill="#0088FE" radius={4} name="Students" />
-            <Bar dataKey="total" fill="#FFBB28" radius={4} name="Total" style={{ display: 'none' }} />
+            <Bar dataKey="parents" fill="#FFBB28" radius={4} name="Parents"></Bar>
+            <Bar dataKey="total" fill="#C70039" radius={4} name="Total" style={{ display: 'none' }} />
           </BarChart>
         </ChartContainer>
   )

@@ -20,7 +20,6 @@ export default function MessagesPage() {
     sendMessage,
     getMessagesForSelectedContact
   } = useMessageStore()
-  console.log(contacts)
   // Initialize socket connection
   useEffect(() => {
     if (auth) {

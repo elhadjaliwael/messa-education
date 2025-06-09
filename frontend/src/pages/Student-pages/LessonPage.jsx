@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate,useLocation} from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -22,18 +22,16 @@ function LessonPage() {
   const [readingProgress, setReadingProgress] = useState(0);
   const [completed, setCompleted] = useState(false);
   const contentRef = useRef(null);
-  // Add time tracking
-  const [startTime, setStartTime] = useState(null);
   const [timeSpent, setTimeSpent] = useState(0);
-  const timeIntervalRef = useRef(null);
 
 
   useEffect(() => {
     const fetchLesson = async () => {
       try {
         const response = await axiosPrivate.get(`/courses/student/lessons/${lessonId}`);
+        const progress = await axiosPrivate.get(`/courses/analytics/progress/${subject}`)
         setLesson(response.data.lesson);
-        setCompleted(response.data.lesson.completed || false);
+        setCompleted(progress.data.completedLessons.contains(lessonId));
         setLoading(false);
       } catch (err) {
         console.error('Error fetching lesson:', err);

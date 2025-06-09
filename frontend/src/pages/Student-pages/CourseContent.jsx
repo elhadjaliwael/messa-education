@@ -44,7 +44,6 @@ function CourseContent() {
     const getProgress = async () => {
       try {
         const response = await axiosPrivate.get(`courses/analytics/progress/${subject}`);
-        console.log(response)
         if (response.data && typeof response.data.progress === 'number') {
           setProgress(response.data.progress);
           
@@ -230,8 +229,8 @@ function CourseContent() {
         
         <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
           <div>
-            <h1 className="text-3xl font-bold mb-2">{subject}</h1>
-            <p className="text-muted-foreground mb-4">Cours de {subject} pour {auth.user.level}</p>
+            <h1 className="text-3xl font-bold mb-2">{subject.charAt(0).toUpperCase()+subject.slice(1)}</h1>
+            <p className="text-muted-foreground mb-4">Cours de {subject} pour {auth.user.level.replace(/_/g, ' ')}</p>
             
             <div className="flex items-center mb-4">
               <Progress value={progress} className="h-2 w-48 mr-4" />

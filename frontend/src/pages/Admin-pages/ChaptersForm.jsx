@@ -95,13 +95,13 @@ function ChaptersForm({ prevStep, nextStep }) {
           ) : (
             <div className="space-y-4">
               {courseData.chapters.map((chapter) => (
-                <div key={chapter.id} className="border rounded-md p-4">
+                <div key={chapter._id} className="border rounded-md p-4">
                   <div className="flex justify-between items-center">
                     <div>
                       <h4 className="font-medium">{chapter.order}. {chapter.title}</h4>
                       <p className="text-sm text-muted-foreground">{chapter.description}</p>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={() => removeChapter(chapter.id)}>
+                    <Button variant="ghost" size="icon" onClick={() => removeChapter(chapter._id)}>
                       <Trash2 className="h-4 w-4 text-red-500" />
                     </Button>
                   </div>

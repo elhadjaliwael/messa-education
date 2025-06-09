@@ -12,10 +12,8 @@ import SubjectsList from "./SubjectList"
 
 
 export default function CoursesPage() {
-  const [selectedSubject, setSelectedSubject] = useState("all")
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(true) // Show subscription modal by default
   const {auth} = useAuth()
-  const subjectList = classes[auth.user.level]
   const handleSubscription = () => {
     // Handle subscription payment
     // For demo purposes, we'll just close the modal and set a flag
@@ -49,7 +47,7 @@ export default function CoursesPage() {
         transition={{ duration: 0.5 }}
       >
         <h2 className="text-2xl font-bold mb-8">Nos matières</h2>
-        <SubjectsList classLevel={auth.user.level} setSelectedSubject={setSelectedSubject}></SubjectsList>
+        <SubjectsList classLevel={auth.user.level}></SubjectsList>
       </motion.div>
       {showSubscriptionModal && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">

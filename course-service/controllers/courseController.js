@@ -1,27 +1,32 @@
 import {Chapter, Lesson } from '../models/course.js';
 import Assignment from '../models/assignments.js';
-import { notifyCourseCreated, notifyNewCourseFromTeacher } from '../services/rabbitmq.service.js';
-import { notifyAssignmentCreated } from '../services/rabbitmq.service.js';
+import { notifyCourseCreated, notifyNewCourseFromTeacher,notifyAssignmentCompleted,notifyAssignmentCreated } from '../services/rabbitmq.service.js';
 
 // Chapter controllers
 // Renamed from createCourse to createChapter
 export const createChapter = async (req, res) => {
   try {
+    console.log(req.user)
     const addedById = req.user.id
     const addedByName = req.user.role === "teacher" ? req.user.name : "Admin"
     req.body.addedById = addedById;
     req.body.addedByName = addedByName;
     const chapter = new Chapter(req.body);
     await chapter.save();
-    if(req.user.role === "teacher"){
-      await notifyNewCourseFromTeacher(chapter)
-    }
-    if(chapter.isPublished){
-      await notifyCourseCreated(chapter)
+    try {
+      if(req.user.role === "teacher"){
+        await notifyNewCourseFromTeacher(chapter)
+      }
+      if(chapter.isPublished){
+        await notifyCourseCreated(chapter)
+      }
+    } catch (error) {
+      console.error(`An error occured while sending notification:`, error);
     }
     res.status(201).json({message : 'Chapter created successfully', chapterId: chapter._id});
 
   } catch (error) {
+    console.log(error.message)
     res.status(400).json({ error: error.message });
   }
 }
@@ -91,7 +96,6 @@ export const getChapterById = async (req, res) => {
 export const updateChapter = async (req, res) => {
   try {
     const chapter = await Chapter.findById(req.params.chapterId);
-    console.log("heelo")
     if (!chapter) {
       return res.status(404).json({ message: 'Chapter not found' });
     } 
@@ -120,12 +124,16 @@ export const updateChapter = async (req, res) => {
 export const toggleChapterPublish = async (req, res) => {
   try {
     const chapter = await Chapter.findById(req.params.chapterId);
-    console.log("hello")
+
     if (!chapter) {
       return res.status(404).json({ message: 'Chapter not found' });
     } 
     chapter.isPublished = !chapter.isPublished;
     await chapter.save();
+    if(chapter.isPublished){
+      await notifyCourseCreated(chapter)
+    }
+    
     res.status(200).json({message: `Chapter ${chapter.isPublished ? 'Published' : 'Unpublished'} successfully`});
   } 
   catch (error) {
@@ -175,7 +183,7 @@ export const createLesson = async (req, res) => {
       isNew : false,
       chapterId
     });
-    
+    console.log(lesson)
     await lesson.save();
     
     // Update chapter counts
@@ -269,7 +277,6 @@ export const deleteChapter = async (req, res) => {
 export const getAllChaptersBySubjectAndClassLevel = async (req, res) => {
   try {
     const { subject, classLevel } = req.params
-    console.log(subject, classLevel)
     // Use regex with 'i' flag for case-insensitive search
     const chapters = await Chapter.find({ 
       subject: { $regex: new RegExp('^' + subject + '$', 'i') },
@@ -280,7 +287,6 @@ export const getAllChaptersBySubjectAndClassLevel = async (req, res) => {
     if(chapters.length === 0){
       return res.status(404).json({ message: 'Chapters not found' }); 
     }
-    console.log(chapters)
     res.status(200).json({message: 'Chapters found successfully', chapters}); 
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -347,7 +353,6 @@ export const getQuizzByLessonAndQuizzId = async (req, res) => {
 
 export const createAssignment = async (req, res) => {
   try {
-    console.log(req.body)
     const assignment = new Assignment(req.body);
     await assignment.save();
     await notifyAssignmentCreated(assignment); // Notify the assignmen
@@ -402,6 +407,26 @@ export const getAssignments = async (req, res) => {
       }
     });
   } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+}
+
+export const updateStatus = async (req,res) => {
+  try {
+    const assignmentId = req.params.id;
+    const { status } = req.body;
+    const assignment = await Assignment.findById(assignmentId);
+    if (!assignment) {
+      throw new Error('Assignment not found');
+    }
+    assignment.status = status;
+    await assignment.save();
+    if(status === 'completed'){
+      await notifyAssignmentCompleted(assignment);
+    }
+    res.status(200).json({message: 'Assignment status updated successfully'});
+  } catch (error) {
+    console.error('Error updating assignment status:', error.message);
     res.status(400).json({ error: error.message });
   }
 }

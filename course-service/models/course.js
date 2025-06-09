@@ -65,6 +65,7 @@ const QuizSchema = new mongoose.Schema({
 });
 
 // Exercise schema
+// Exercise schema
 const ExerciseSchema = new mongoose.Schema({
   title: {
     type: String,
@@ -76,8 +77,36 @@ const ExerciseSchema = new mongoose.Schema({
     enum: ['coding', 'written', 'project'],
     default: 'coding'
   },
-  content: String,
-  solution: String,
+  content: {
+    text: {
+      type: String,
+      default: ''
+    },
+    imageUrl: {
+      type: String,
+      default: ''
+    },
+    contentType: {
+      type: String,
+      enum: ['text', 'image', 'both'],
+      default: 'text'
+    }
+  },
+  solution: {
+    text: {
+      type: String,
+      default: ''
+    },
+    imageUrl: {
+      type: String,
+      default: ''
+    },
+    solutionType: {
+      type: String,
+      enum: ['text', 'image', 'both'],
+      default: 'text'
+    }
+  },
   points: {
     type: Number,
     default: 10
@@ -122,7 +151,6 @@ const ChapterSchema = new mongoose.Schema({
   addedById : {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
   },
   addedByName : {
     type: String,

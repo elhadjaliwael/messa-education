@@ -2,15 +2,17 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Code, PenTool, Clock, ArrowRight, CheckCircle, Star, RotateCw } from "lucide-react";
+import { FileText, Code, PenTool, Clock, ArrowRight, CheckCircle, Star, RotateCw, BookOpen } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { axiosPrivate } from '@/api/axios';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import useCourseStore from '@/store/courseStore';
 
 function ExerciseList({ exercises, onSelectExercise, completedExercises = [],lessonId }) {
   const [exerciseActivities, setExerciseActivities] = useState({});
   const [loading, setLoading] = useState(false);
-  console.log(exerciseActivities)
+  const {assignments} = useCourseStore();
+  
   if (!exercises || exercises.length === 0) {
     return (
       <div className="text-center p-8 bg-muted/10 rounded-lg border border-dashed border-muted">
@@ -22,6 +24,18 @@ function ExerciseList({ exercises, onSelectExercise, completedExercises = [],les
   }
 
   useEffect(() => {
+    const fetchAssignments = async () => {
+      try {
+        if(assignments.length > 0) {
+          return;
+        }
+        const response = await axiosPrivate.get(`/courses/student/assignments`);
+        const assignmentsData = response.data.assignments;
+        useCourseStore.setState({ assignments: assignmentsData });
+      } catch (error) {
+        console.error("Error fetching assignments:", error);
+      }
+    };
     const fetchExerciseActivities = async () => {
       setLoading(true);
       try {
@@ -59,6 +73,7 @@ function ExerciseList({ exercises, onSelectExercise, completedExercises = [],les
     };
     
     fetchExerciseActivities();
+    fetchAssignments();
   }, [exercises]);
 
   const getExerciseTypeIcon = (type) => {
@@ -101,11 +116,19 @@ function ExerciseList({ exercises, onSelectExercise, completedExercises = [],les
           const lastAttempt = attempts > 0 ? activities[0] : null;
           const hasSuccessfulAttempt = activities.some(a => a.activityType === 'exercise_complete');
           
+          // Check if this exercise is part of an assignment
+          const currentAssignment = assignments.find(a => a.exercise?.id === exercise._id);
+          const isAssignmentExercise = Boolean(currentAssignment);
+          
           return (
             <Card 
               key={exercise._id} 
               className={`hover:shadow-md transition-all duration-200 ${
-                hasSuccessfulAttempt ? 'border-green-200 bg-green-50/30 dark:bg-green-900/10' : ''
+                hasSuccessfulAttempt 
+                  ? 'border-green-200 bg-green-50/30 dark:bg-green-900/10' 
+                  : isAssignmentExercise 
+                    ? 'ring-1 ring-blue-200' 
+                    : ''
               }`}
             >
               <CardHeader className="pb-2 relative">
@@ -114,8 +137,27 @@ function ExerciseList({ exercises, onSelectExercise, completedExercises = [],les
                     <CheckCircle className="h-5 w-5" />
                   </div>
                 )}
+                {isAssignmentExercise && (
+                  <div className="absolute -top-2 -left-2 bg-blue-100 text-blue-700 rounded-full p-1 shadow-sm border border-blue-200">
+                    <BookOpen className="h-4 w-4" />
+                  </div>
+                )}
                 <div className="flex justify-between items-start">
-                  <CardTitle className="text-base">{exercise.title}</CardTitle>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <CardTitle className="text-base">{exercise.title}</CardTitle>
+                      {isAssignmentExercise && (
+                        <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800 border-blue-200">
+                          Devoir
+                        </Badge>
+                      )}
+                    </div>
+                    {isAssignmentExercise && currentAssignment && (
+                      <div className="text-xs text-blue-600 mb-1">
+                        Échéance: {new Date(currentAssignment.dueDate).toLocaleDateString('fr-FR')}
+                      </div>
+                    )}
+                  </div>
                   <div className="flex gap-2">
                     {exercise.difficulty && (
                       <Badge variant="outline" className={`${getDifficultyColor(exercise.difficulty)}`}>
@@ -142,6 +184,12 @@ function ExerciseList({ exercises, onSelectExercise, completedExercises = [],les
                     <Star className="h-3 w-3 mr-1 text-amber-400" /> 
                     {exercise.points || 10} points
                   </span>
+                  {isAssignmentExercise && (
+                    <span className="flex items-center text-blue-600">
+                      <BookOpen className="h-3 w-3 mr-1" /> 
+                      Assigné
+                    </span>
+                  )}
                   {attempts > 0 && (
                     <TooltipProvider>
                       <Tooltip>

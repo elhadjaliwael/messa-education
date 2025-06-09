@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { MyPieChart } from '@/components/MyPieChart';
 import { MyBarChart } from '@/components/MyBarChart';
+import { NotificationBell } from '@/components/NotificationBell';
 
 
 const AdminDashboardPage = () => {
@@ -15,6 +16,7 @@ const AdminDashboardPage = () => {
       totalUsers: 0,
       totalStudents: 0,
       totalTeachers: 0,
+      totalParents: 0,
       activeTeachers: 0,
       studentPercentage: 0,
       teacherPercentage: 0
@@ -45,6 +47,7 @@ const AdminDashboardPage = () => {
     fetchAnalytics();
   }, [axiosPrivate]);
 
+  console.log(analytics.registrationTrends)
   // Format date for display
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -78,6 +81,7 @@ const AdminDashboardPage = () => {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold tracking-tight">Overview</h1>
+        <NotificationBell/>
       </div>
 
       {/* Overview Stats */}

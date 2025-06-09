@@ -36,6 +36,11 @@ import TeacherDashboardPage from '../src/pages/Teacher-page/TeacherDashboardPage
 //parent pages
 import ParentDashboard from './pages/Parent-pages/ParentDashboard'
 import ParentPage from './pages/ParentPage'
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
+import OTPVerification from './components/OTPVerification';
+import CompleteRegistration from './pages/CompleteRegistration';
+
 function App() {
   const { theme, setTheme } = useTheme();
   return (
@@ -47,15 +52,17 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<SignUp />} />
-
+            <Route path="/verify-email" element={<OTPVerification />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/forgot-password/:userId/:token" element={<ResetPassword />} />
+            <Route path="/complete-registration" element={<CompleteRegistration />} />
             {/* Protected Student routes */}
             <Route element={<ProtectedRoute allowedRoles={['student']} />}>
               <Route path="/student" element={<StudentDashboard />}>
                 <Route index element={<DashboardPage />} />
                 <Route path="courses" element={<CoursesPage />} />
                 <Route path="messages" element={<MessagesPage />} />
-                <Route path="settings" element={<SettingsPage />} />
-                
+                <Route path="settings" element={<SettingsPage />} /> 
                 {/* Nested course routes */}
                 <Route path="courses/:subject" element={<CourseContent />} />
                 <Route path="courses/:subject/chapters/:chapterId/lessons/:lessonId" element={<LessonPage />} />
@@ -73,6 +80,7 @@ function App() {
                 <Route path="settings" element={<SettingsPage />} />
 
                 <Route path="courses/add" element={<AddCourse />} />
+                <Route path="courses/:id/view" element={<CourseViewPage />} />
               </Route>
             </Route>
 
@@ -109,4 +117,4 @@ function App() {
   )
 }
 
-export default App
+export default App;

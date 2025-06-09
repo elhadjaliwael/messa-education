@@ -16,7 +16,8 @@ import {
     getExerciseByLessonAndExerciseId,
     getQuizzByLessonAndQuizzId,
     createAssignment,
-    getAssignments
+    getAssignments,
+    updateStatus
  } from '../controllers/courseController.js';
 const router = express.Router();
 
@@ -39,6 +40,7 @@ router.get('/student/lessons/:lessonId/quizzes/:quizzId',getQuizzByLessonAndQuiz
 router.put('/:chapterId/lessons/:lessonId', updateLesson);
 router.post('/student/assignments', createAssignment)
 router.get('/student/assignments',getAssignments)
+router.post('/student/assignments/:id', updateStatus)
 router.delete('/:chapterId/lessons/:lessonId', deleteLesson);
 
 export default router;

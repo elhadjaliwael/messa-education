@@ -13,11 +13,13 @@ import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useNavigate } from "react-router"
 import { NotificationBell } from "@/components/NotificationBell"
+import useCourseStore from "@/store/courseStore"
 
 export default function DashboardPage() {
   const navigate = useNavigate()
   // Initialize analytics with default empty structure
-  const [assignments, setAssignments] = useState([]);
+  const {assignments,updateAssignments} = useCourseStore()
+  console.log(assignments)
   const [analytics, setAnalytics] = useState({
     stats: {
       totalCourses: 0,
@@ -43,7 +45,7 @@ export default function DashboardPage() {
     progressTrend: []
   });
   const { auth } = useAuth();
-  
+  console.log(analytics.courseProgress)
   useEffect(() => {
     const fetchAnalytics = async () => {
       try {
@@ -58,8 +60,8 @@ export default function DashboardPage() {
     const fetchAssignments = async () => {
       try {
         const response = await axiosPrivate.get('/courses/student/assignments');
-        console.log(response.data.assignments)
-        setAssignments(response.data.assignments);
+
+        updateAssignments(response.data.assignments);
       } catch (error) {
         console.error('Error fetching assignments:', error);
       }
@@ -70,10 +72,10 @@ export default function DashboardPage() {
 
   const getAssignmentLink = (assignment) => {
     if (assignment.exercise === null) {
-      return `/student/courses/${assignment.subject.name}/chapters/${assignment.chapter.id}/lessons/${assignment.lesson.id}/quizzes/${assignment.quizz.id}`; 
+      return `/student/courses/${assignment.subject.name.toLowerCase()}/chapters/${assignment.chapter.id}/lessons/${assignment.lesson.id}/quizzes/${assignment.quizz.id}`; 
     } 
     if (assignment.quizz === null) {
-      return `/student/courses/${assignment.subject.name}/chapters/${assignment.chapter.id}/lessons/${assignment.lesson.id}/exercises/${assignment.exercise.id}`;
+      return `/student/courses/${assignment.subject.name.toLowerCase()}/chapters/${assignment.chapter.id}/lessons/${assignment.lesson.id}/exercises/${assignment.exercise.id}`;
     }
   }
 
@@ -225,7 +227,7 @@ export default function DashboardPage() {
                           variant="ghost" 
                           size="sm" 
                           className="text-xs h-7 px-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800" 
-                          onClick={() => navigate(`/student/courses/${course.subject}`)}
+                          onClick={() => navigate(`/student/courses/${course.subject.toLowerCase()}`)}
                         >
                           Continuer
                           <ChevronRight className="ml-1 h-3 w-3" />
@@ -289,7 +291,7 @@ export default function DashboardPage() {
                         <div className="flex items-start gap-3">
                           {/* Simple status dot indicator */}
                           <div className={`mt-1.5 h-2 w-2 rounded-full flex-shrink-0 ${
-                            assignment.progress === 100 
+                            assignment.status === "completed" 
                               ? "bg-emerald-500" 
                               : new Date(assignment.dueDate) < new Date() 
                                 ? "bg-rose-500" 
@@ -303,7 +305,6 @@ export default function DashboardPage() {
                                 {assignment.subject?.name || "Devoir sans matière"}
                               </h4>
                               <div className="flex gap-2 items-center">
-                                {/* Assignment type badge */}
                                 {assignment.exercise === null && (
                                   <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
                                     Quiz
@@ -315,11 +316,20 @@ export default function DashboardPage() {
                                   </Badge>
                                 )}
                                 <Badge variant="outline" className="text-xs font-normal px-1.5 py-0">
-                                  {assignment.progress === 100 
-                                    ? "Terminé" 
-                                    : new Date(assignment.dueDate) < new Date() 
-                                      ? "En retard" 
-                                      : "En cours"}
+                                  {(() => {
+                                    switch (assignment.status) {
+                                      case 'completed':
+                                        return "Terminé";
+                                      case 'late':
+                                        return new Date(assignment.dueDate) < new Date() ? "En retard" : "En cours";
+                                      case 'in_progress':
+                                        return "En cours";
+                                      case 'pending':
+                                        return "En attente";
+                                      default:
+                                        return "En cours";
+                                    }
+                                  })()}
                                 </Badge>
                               </div>
                             </div>
@@ -330,25 +340,11 @@ export default function DashboardPage() {
                               {assignment.chapter?.title && assignment.lesson?.title && " • "}
                               {assignment.lesson?.title && `${assignment.lesson.title}`}
                             </div>
-                            
-                            {/* Simple progress bar */}
-                            <div className="mt-2 mb-1">
-                              <Progress 
-                                value={assignment.progress ?? 0} 
-                                className="h-1 bg-slate-100 dark:bg-slate-800"
-                                indicatorClassName={
-                                  assignment.progress === 100 
-                                    ? "bg-emerald-500" 
-                                    : "bg-blue-500"
-                                }
-                              />
-                            </div>
+                      
                             
                             {/* Due date and progress in a single line */}
                             <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
-                              <span>
-                                {assignment.progress ?? 0}% terminé
-                              </span>
+  
                               <span>
                                 {assignment.dueDate 
                                   ? new Date(assignment.dueDate).toLocaleDateString('fr-FR', {day: 'numeric', month: 'short'}) 

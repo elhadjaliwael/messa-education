@@ -7,6 +7,7 @@ import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import useAuth from "@/hooks/useAuth"
+import { NotificationBell } from '@/components/NotificationBell'
 
 function TeacherDashboardPage() {
   const { user } = useAuth();
@@ -61,16 +62,10 @@ function TeacherDashboardPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <NotificationBell />
           <Button variant="outline" size="sm">
             <CalendarIcon className="mr-2 h-4 w-4" />
             Calendrier
-          </Button>
-          <Button variant="outline" size="sm" className="relative">
-            <BellIcon className="mr-2 h-4 w-4" />
-            Notifications
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-              3
-            </span>
           </Button>
           <Button variant="default" size="sm">
             <MessageSquareIcon className="mr-2 h-4 w-4" />

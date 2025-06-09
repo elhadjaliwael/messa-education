@@ -17,10 +17,12 @@ export const setupRabbitMQ = async () => {
     channel.consume('auth.get.students', async (msg) => {
       try {
         // Get all students from the database
-        const targetUsers = JSON.parse(msg.content.toString());
-        const role = targetUsers === 'all' ? 'student' : targetUsers;
-        const users = await User.find({ role }).select('-password');
-        
+        const {targetUsers,data} = JSON.parse(msg.content.toString());
+        let query = {role : targetUsers}
+        if(targetUsers === "student"){
+          query.level = data.classLevel
+        }
+        const users = await User.find(query).select('-password');
         // Send back the response
         channel.sendToQueue(
           msg.properties.replyTo,

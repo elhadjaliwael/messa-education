@@ -117,19 +117,25 @@ function StudentSignUpForm() {
         }
     };
 
+    // Add loading state
+    const [isLoading, setIsLoading] = useState(false);
+    
     async function formAction(e) {
         e.preventDefault();
+        setIsLoading(true); // Start loading
+        
         const newErrors = {};
         Object.keys(formData).forEach(key => {
             const error = validateField(key, formData[key]);
             if (error) newErrors[key] = error;
         });
-
+    
         if (Object.keys(newErrors).length > 0) {
             setErrors(newErrors);
+            setIsLoading(false); // Stop loading
             return;
         }
-
+    
         try {
             const res = await axiosPrivate.post('http://localhost:8000/api/auth/register', formData, {
                 headers: {
@@ -139,36 +145,44 @@ function StudentSignUpForm() {
             });
             
             if (res.status === 201) {
-                toast.success('Registration successful!');
-                let redirectPath;
-                const user = res.data.user;
-                setAuth({ user, accessToken: res.data.accessToken });
-                if (from && from !== "/") {
-                    redirectPath = from;
-                } else if (user?.role) {
-                    // Role-based routing
-                    console.log("wael")
-                    switch(user.role.toLowerCase()) {
-                        case 'admin':
-                            redirectPath = '/admin';
-                            break;
-                        case 'teacher':
-                            redirectPath = '/teacher';
-                            break;
-                        case 'student':
-                            redirectPath = '/student';
-                            break;
-                        default:
-                            redirectPath = '/login';
-                    }
+                if (res.data.requiresEmailVerification) {
+                    toast.success('Registration successful! Please check your email to verify your account.');
+                    navigate('/verify-email', { 
+                        state: { email: formData.email },
+                        replace: true 
+                    });
                 } else {
-                    redirectPath = '/signup';
+                    // Handle case where email verification is not required
+                    toast.success('Registration successful!');
+                    const user = res.data.user;
+                    setAuth({ user, accessToken: res.data.accessToken });
+                    if (from && from !== "/") {
+                        redirectPath = from;
+                    } else if (user?.role) {
+                        // Role-based routing
+                        console.log("wael")
+                        switch(user.role.toLowerCase()) {
+                            case 'admin':
+                                redirectPath = '/admin';
+                                break;
+                            case 'teacher':
+                                redirectPath = '/teacher';
+                                break;
+                            case 'student':
+                                redirectPath = '/student';
+                                break;
+                            default:
+                                redirectPath = '/login';
+                        }
+                    } else {
+                        redirectPath = '/signup';
+                    }
+                    
+                    // Navigate after a short delay to ensure toast is visible
+                    setTimeout(() => {
+                        navigate(redirectPath, { replace: true });
+                    }, 500);
                 }
-                
-                // Navigate after a short delay to ensure toast is visible
-                setTimeout(() => {
-                    navigate(redirectPath, { replace: true });
-                }, 500);
             }
         } catch (error) {
             console.log(error)
@@ -330,8 +344,23 @@ function StudentSignUpForm() {
                         </div>
                     )}
                 </div>
-                <button type="submit" className='cursor-pointer bg-primary text-primary-foreground font-primary font-medium w-full h-[40px] rounded-lg mt-2'>
-                    Sign Up
+                <button 
+                    type="submit" 
+                    disabled={isLoading}
+                    className={`cursor-pointer font-primary font-medium w-full h-[40px] rounded-lg mt-2 transition-all duration-200 ${
+                        isLoading 
+                            ? 'bg-gray-400 text-gray-600 cursor-not-allowed' 
+                            : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                    }`}
+                >
+                    {isLoading ? (
+                        <div className="flex items-center justify-center gap-2">
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            <span>Signing Up...</span>
+                        </div>
+                    ) : (
+                        'Sign Up'
+                    )}
                 </button>
             </form>
             <div className='flex justify-center items-center'>

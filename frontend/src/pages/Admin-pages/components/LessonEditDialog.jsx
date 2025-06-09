@@ -22,53 +22,63 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import QuizzesForm from "./QuizzesForm.jsx";
 import ExercisesForm from "./ExercisesForm.jsx";
+import useCourseStore from '@/store/courseStore.js';
 
 const LessonEditDialog = ({ 
   open, 
   onOpenChange, 
   lesson, 
   onSave, 
-  contentTypeOptions = ['Video', 'Text', 'Exercise', 'Quiz'] 
+  contentTypeOptions = ['Video', 'Text', 'Exercise', 'Quiz'],
+  atab = "basic"  // Add default value
 }) => {
-  const [editedLesson, setEditedLesson] = useState(lesson || {});
-  const [activeTab, setActiveTab] = useState("basic");
 
-  // Initialize exercises and quizzes if they don't exist
+  const { updateCurrentLesson, currentLesson } = useCourseStore();
+  const [activeTab, setActiveTab] = useState(atab || "basic");
   useEffect(() => {
-    if (lesson) {
-      setEditedLesson({
+    if (atab) {
+      setActiveTab(atab);
+    }
+  }, [atab]);
+  
+  // Initialize the store with lesson data when dialog opens
+  useEffect(() => {
+    if (lesson && open) {
+      const lessonData = {
         ...lesson,
         exercises: lesson.exercises || [],
         quizzes: lesson.quizzes || []
-      });
+      };
+      updateCurrentLesson(lessonData);
     }
-  }, [lesson]);
+  }, [lesson, open, updateCurrentLesson]);
 
   const handleInputChange = (field, value) => {
-    setEditedLesson(prev => ({
-      ...prev,
+    const updatedLesson = {
+      ...currentLesson,
       [field]: value
-    }));
+    };
+    updateCurrentLesson(updatedLesson);
   };
 
   const handleSave = () => {
     // Create a clean copy of the lesson without __v field
-    const lessonToSave = { ...editedLesson };
+    const lessonToSave = { ...currentLesson };
     
     // Remove the __v field if it exists to avoid version conflicts
     if (lessonToSave.__v !== undefined) {
       delete lessonToSave.__v;
     }
-    
     onSave(lessonToSave);
   };
 
   // Update current lesson from child components
-  const updateCurrentLesson = (updates) => {
-    setEditedLesson(prev => ({
-      ...prev,
+  const updateCurrentLessonLocal = (updates) => {
+    const updatedLesson = {
+      ...currentLesson,
       ...updates
-    }));
+    };
+    updateCurrentLesson(updatedLesson);
   };
 
   return (
@@ -89,7 +99,7 @@ const LessonEditDialog = ({
           </TabsList>
 
           <TabsContent value="basic">
-            {editedLesson && (
+            {currentLesson && (
               <div className="grid gap-4 py-2">
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="lessonTitle" className="text-right">
@@ -97,7 +107,7 @@ const LessonEditDialog = ({
                   </Label>
                   <Input
                     id="lessonTitle"
-                    value={editedLesson.title || ''}
+                    value={currentLesson.title || ''}
                     onChange={(e) => handleInputChange('title', e.target.value)}
                     className="col-span-3"
                   />
@@ -108,7 +118,7 @@ const LessonEditDialog = ({
                   </Label>
                   <Textarea
                     id="lessonDescription"
-                    value={editedLesson.description || ''}
+                    value={currentLesson.description || ''}
                     onChange={(e) => handleInputChange('description', e.target.value)}
                     className="col-span-3"
                   />
@@ -118,7 +128,7 @@ const LessonEditDialog = ({
                     Content Type
                   </Label>
                   <Select
-                    value={editedLesson.contentType || ''}
+                    value={currentLesson.contentType || ''}
                     onValueChange={(value) => handleInputChange('contentType', value)}
                   >
                     <SelectTrigger id="contentType" className="col-span-3">
@@ -140,7 +150,7 @@ const LessonEditDialog = ({
                   <Input
                     id="lessonTime"
                     type="number"
-                    value={editedLesson.estimatedTime || 0}
+                    value={currentLesson.estimatedTime || 0}
                     onChange={(e) => handleInputChange('estimatedTime', parseInt(e.target.value) || 0)}
                     className="col-span-3"
                   />
@@ -152,7 +162,7 @@ const LessonEditDialog = ({
                   <Input
                     id="lessonOrder"
                     type="number"
-                    value={editedLesson.order || 1}
+                    value={currentLesson.order || 1}
                     onChange={(e) => handleInputChange('order', parseInt(e.target.value) || 1)}
                     className="col-span-3"
                   />
@@ -162,16 +172,13 @@ const LessonEditDialog = ({
           </TabsContent>
           
           <TabsContent value="exercises">
-            <ExercisesForm 
-              currentLesson={editedLesson} 
-              updateCurrentLesson={updateCurrentLesson} 
-            />
+            <ExercisesForm/>
           </TabsContent>
 
           <TabsContent value="quizzes">
             <QuizzesForm 
-              currentLesson={editedLesson} 
-              updateCurrentLesson={updateCurrentLesson} 
+              currentLesson={currentLesson} 
+              updateCurrentLesson={updateCurrentLessonLocal} 
             />
           </TabsContent>
         </Tabs>

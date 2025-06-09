@@ -1,6 +1,4 @@
 import mongoose from 'mongoose';
-import argon2 from 'argon2';
-
 const userSchema = new mongoose.Schema({
   username: {
     type: String,
@@ -81,9 +79,25 @@ const userSchema = new mongoose.Schema({
   tempPassword: {
     type: String,
     select: false // This ensures it's not returned in normal queries
+  },
+  // Add OTP verification fields
+  isEmailVerified: {
+    type: Boolean,
+    default: false
+  },
+  emailVerificationOTP: {
+    type: String,
+    select: false // Don't return in normal queries
+  },
+  otpExpiresAt: {
+    type: Date,
+    select: false
+  },
+  isGoogleUser: {
+    type: Boolean,
+    select: false
   }
 });
-
 
 const User = mongoose.model('User', userSchema);
 

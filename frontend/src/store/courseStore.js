@@ -11,7 +11,7 @@ const useCourseStore = create((set) => ({
     chapters: [],
     slug: ''
   },
-  
+  assignments: [],
   currentChapter: {
     title: '',
     description: '',
@@ -47,6 +47,24 @@ const useCourseStore = create((set) => ({
     title: '',
     url: '',
     type: 'pdf'
+  },
+  
+  // New exercise template with updated schema
+  currentExercise: {
+    title: '',
+    description: '',
+    type: 'coding',
+    points: 10,
+    content: {
+      text: '',
+      imageUrl: '',
+      contentType: 'text'
+    },
+    solution: {
+      text: '',
+      imageUrl: '',
+      solutionType: 'text'
+    }
   },
   
   // Course data actions
@@ -90,9 +108,28 @@ const useCourseStore = create((set) => ({
       title: '',
       url: '',
       type: 'pdf'
+    },
+    currentExercise: {
+      title: '',
+      description: '',
+      type: 'coding',
+      points: 10,
+      content: {
+        text: '',
+        imageUrl: '',
+        contentType: 'text'
+      },
+      solution: {
+        text: '',
+        imageUrl: '',
+        solutionType: 'text'
+      }
     }
   }),
   
+  updateAssignments: (data) => set((state) => ({
+    assignments: [...state.assignments,...data ]
+  })),
   // Chapter actions
   updateCurrentChapter: (data) => set((state) => ({
     currentChapter: { ...state.currentChapter, ...data }
@@ -100,7 +137,7 @@ const useCourseStore = create((set) => ({
   
   addChapter: () => set((state) => {
     const newChapter = {
-      id: uuidv4(),
+      _id: uuidv4(),
       ...state.currentChapter
     };
     
@@ -121,7 +158,7 @@ const useCourseStore = create((set) => ({
   removeChapter: (chapterId) => set((state) => ({
     courseData: {
       ...state.courseData,
-      chapters: state.courseData.chapters.filter(chapter => chapter.id !== chapterId)
+      chapters: state.courseData.chapters.filter(chapter => chapter._id !== chapterId)
     }
   })),
   
@@ -132,12 +169,12 @@ const useCourseStore = create((set) => ({
 
   addLesson: (chapterId) => set((state) => {
     const newLesson = {
-      id: uuidv4(),
+      _id: uuidv4(),
       ...state.currentLesson
     };
     
     const updatedChapters = state.courseData.chapters.map(chapter => {
-      if (chapter.id === chapterId) {
+      if (chapter._id === chapterId) {
         return {
           ...chapter,
           lessons: [...chapter.lessons, newLesson]
@@ -173,10 +210,10 @@ const useCourseStore = create((set) => ({
   
   removeLesson: (chapterId, lessonId) => set((state) => {
     const updatedChapters = state.courseData.chapters.map(chapter => {
-      if (chapter.id === chapterId) {
+      if (chapter._id === chapterId) {
         return {
           ...chapter,
-          lessons: chapter.lessons.filter(lesson => lesson.id !== lessonId)
+          lessons: chapter.lessons.filter(lesson => lesson._id !== lessonId)
         };
       }
       return chapter;
@@ -190,6 +227,53 @@ const useCourseStore = create((set) => ({
     };
   }),
   
+  // Exercise actions
+  updateCurrentExercise: (data) => set((state) => ({
+    currentExercise: { ...state.currentExercise, ...data }
+  })),
+  
+  addExercise: () => set((state) => ({
+    currentLesson: {
+      ...state.currentLesson,
+      exercises: [...state.currentLesson.exercises, { 
+        _id: uuidv4(),
+        ...state.currentExercise 
+      }]
+    },
+    currentExercise: {
+      title: '',
+      description: '',
+      type: 'coding',
+      points: 10,
+      content: {
+        text: '',
+        imageUrl: '',
+        contentType: 'text'
+      },
+      solution: {
+        text: '',
+        imageUrl: '',
+        solutionType: 'text'
+      }
+    }
+  })),
+  
+  removeExercise: (exerciseId) => set((state) => ({
+    currentLesson: {
+      ...state.currentLesson,
+      exercises: state.currentLesson.exercises.filter(exercise => exercise._id !== exerciseId)
+    }
+  })),
+  
+  updateExercise: (exerciseId, data) => set((state) => ({
+    currentLesson: {
+      ...state.currentLesson,
+      exercises: state.currentLesson.exercises.map(exercise => 
+        exercise._id === exerciseId ? { ...exercise, ...data } : exercise
+      )
+    }
+  })),
+  
   // Resource actions
   updateCurrentResource: (data) => set((state) => ({
     currentResource: { ...state.currentResource, ...data }
@@ -199,7 +283,7 @@ const useCourseStore = create((set) => ({
     currentLesson: {
       ...state.currentLesson,
       resources: [...state.currentLesson.resources, { 
-        id: uuidv4(),
+        _id: uuidv4(),
         ...state.currentResource 
       }]
     },
@@ -213,7 +297,7 @@ const useCourseStore = create((set) => ({
   removeResource: (resourceId) => set((state) => ({
     currentLesson: {
       ...state.currentLesson,
-      resources: state.currentLesson.resources.filter(resource => resource.id !== resourceId)
+      resources: state.currentLesson.resources.filter(resource => resource._id !== resourceId)
     }
   }))
 }));

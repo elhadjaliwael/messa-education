@@ -116,6 +116,7 @@ const useNotificationStore = create((set, get) => ({
     
     try {
       const response = await axiosPrivate.get(`/notifications`);
+      console.log(response)
       const notifications = response.data.notifications;
       const unreadCount = response.data.unreadCount
       

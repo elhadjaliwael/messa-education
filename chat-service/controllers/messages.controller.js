@@ -1,4 +1,5 @@
 import groupMessages from '../models/messages.js';
+
 export const getMessagesInGroup = async (req,res) => {
     try {
         const groupId = req.params.groupId;
@@ -9,5 +10,4 @@ export const getMessagesInGroup = async (req,res) => {
     }catch (error) {
         return res.status(500).json({ error });
     }
-
 }

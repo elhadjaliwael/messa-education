@@ -15,14 +15,18 @@ function LessonForm({
   courseData, 
   currentLesson, 
   updateCurrentLesson, 
-  selectedChapterId, 
-  setSelectedChapterId, 
-  isEditing, 
-  handleAddLesson, 
-  handleUpdateLesson, 
-  resetForm,
+  lessonManagement,
   handleCloudinaryUpload 
 }) {
+  const {
+    selectedChapterId,
+    setSelectedChapterId,
+    isEditing,
+    handleAddLesson,
+    handleUpdateLesson,
+    resetForm
+  } = lessonManagement;
+  console.log(courseData.chapters[0]._id)
     const [activeTab, setActiveTab] = useState("content");
   // Handle lesson changes
   const handleLessonChange = (e) => {
@@ -40,7 +44,9 @@ function LessonForm({
         <Label htmlFor="chapterSelect">Select Chapter</Label>
         <Select 
           value={selectedChapterId} 
-          onValueChange={setSelectedChapterId}
+          onValueChange={(value) => {
+            setSelectedChapterId(value);
+          }}
           disabled={isEditing}
         >
           <SelectTrigger>
@@ -48,7 +54,7 @@ function LessonForm({
           </SelectTrigger>
           <SelectContent>
             {courseData.chapters.map(chapter => (
-              <SelectItem key={chapter.id} value={chapter.id}>
+              <SelectItem key={chapter._id} value={chapter._id.toString()}>
                 {chapter.order}. {chapter.title}
               </SelectItem>
             ))}
@@ -295,6 +301,7 @@ function LessonForm({
           <ExercisesForm 
             currentLesson={currentLesson}
             updateCurrentLesson={updateCurrentLesson}
+            handleCloudinaryUpload={handleCloudinaryUpload}
           />
         </TabsContent>
         

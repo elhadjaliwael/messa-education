@@ -24,6 +24,7 @@ function AssignExerciseDialog({
     dueDate: "",
     notes: "",
   });
+  console.log(children)
   const [subjects, setSubjects] = useState([]);
   const [chapters, setChapters] = useState([]);
   const [exercises, setExercises] = useState([]);
@@ -71,8 +72,9 @@ function AssignExerciseDialog({
           return quizz ? { id: quizz._id, title: quizz.title } : null;
         })(),
         dueDate: assignmentForm.dueDate,
-        notes: assignmentForm.notes
-      }
+        notes: assignmentForm.notes,
+        status: "pending",
+      };
        await axiosPrivate.post("/courses/student/assignments", assignmentData);
        toast.success("Exercise assigned successfully");
        setAssignmentForm({

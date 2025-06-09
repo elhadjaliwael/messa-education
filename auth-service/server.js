@@ -15,7 +15,7 @@ app.use(cookieParser())
 app.use(express.json());
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/auth/password-reset', passwordResetRoutes);
+app.use('/api/auth/forgot-password', passwordResetRoutes);
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'Auth service is running' });

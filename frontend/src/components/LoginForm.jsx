@@ -78,6 +78,9 @@ function LoginForm() {
                 case 'student':
                     redirectPath = '/student';
                     break;
+                case 'parent' :
+                    redirectPath = '/parent';
+                    break;
                 default:
                     return; // stop here if role is invalid
             }
@@ -143,6 +146,7 @@ function LoginForm() {
                         disabled={isSubmitting}
                     />
                     {formErrors.password && <p className='text-red-500 text-xs'>{formErrors.password}</p>}
+                    <Link to="/forgot-password" className='text-sm mt-2 mx-2 items-end text-primary hover:text-primary/80 transition-colors'>Forgot password?</Link>
                 </div>
                 <Button 
                     type="submit" 

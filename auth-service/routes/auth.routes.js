@@ -19,14 +19,18 @@ import {
     getAnalytics,
     registerParent,
     getChildren,
-    addChild
+    addChild,
+    completeGoogleRegistration,
+    deleteChild
 } from '../controllers/auth.controller.js';
+import { sendOTPEmail, verifyOTP, resendOTP } from '../controllers/otp.controller.js';
 import { googleAuth, googleCallback } from '../controllers/auth.controller.js';
 import { verifyToken } from '../middleware/auth.middleware.js';
 import multer from 'multer';
 
 const router = express.Router();
 const upload = multer({ dest: 'uploads/' });
+
 // Public routes
 router.post('/register', register);
 router.post('/login', login);
@@ -34,6 +38,11 @@ router.post('/logout', logout);
 router.post('/refresh', refresh);
 router.get('/google', googleAuth);
 router.get('/google/callback', googleCallback);
+router.post('/complete-google-registration', completeGoogleRegistration);
+// OTP routes
+router.post('/send-otp', sendOTPEmail);
+router.post('/verify-otp', verifyOTP);
+router.post('/resend-otp', resendOTP);
 
 // Protected routes
 router.get('/verify', verifyToken, verify);
@@ -58,4 +67,5 @@ router.post('/users/change-password', verifyToken, changePassword);
 router.post('/register-parent',registerParent);
 router.get('/children',verifyToken,getChildren)
 router.post('/children',verifyToken,addChild)
+router.delete('/children/:id',verifyToken,deleteChild)
 export default router;

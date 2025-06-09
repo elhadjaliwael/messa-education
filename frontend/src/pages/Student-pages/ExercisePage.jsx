@@ -1,73 +1,131 @@
-import React, { useState, useEffect,useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, ArrowRight, CheckCircle, Code, FileText, PenTool, Award } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle, Code, FileText, PenTool, Award, Eye, BookOpen } from "lucide-react";
 import { toast } from 'sonner';
 import { Badge } from "@/components/ui/badge";
 import { axiosPrivate } from '@/api/axios';
+import useCourseStore from '@/store/courseStore';
 
 function ExercisePage() {
   const { lessonId, exerciseId,chapterId,subject } = useParams();
   const navigate = useNavigate();
   const [exercise, setExercise] = useState(null);
-  const [userSolution, setUserSolution] = useState('');
-  const [showSolution, setShowSolution] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showSolution, setShowSolution] = useState(false);
+  const {assignments} = useCourseStore()
   const startTimeRef = useRef(Date.now());
-  // Handle form submission
-  const handleSubmit = async () => {
-    if (!userSolution.trim()) {
-      toast.warning("Veuillez entrer votre solution avant de soumettre.");
-      return;
-    }
-    
+  
+  // Check if current exercise is part of an assignment
+  const currentAssignment = assignments.find(a => a.exercise?.id === exerciseId);
+  const isAssignmentExercise = Boolean(currentAssignment);
+  
+  // Handle mark as done
+  const handleMarkDone = async () => {
     try {
       // Calculate time spent in seconds
       const timeSpent = Math.floor((Date.now() - startTimeRef.current) / 1000);
       
-      // Determine if the solution is correct (this is a placeholder - you'll need to implement actual validation)
-      const isCorrect = userSolution.trim().toLowerCase() === (exercise.solution || '').trim().toLowerCase();
-      
-      // Track exercise completion in analytics with the appropriate activity type
+      // Track exercise completion in analytics
       await axiosPrivate.post(`/courses/analytics/track`, {
-        activityType: isCorrect ? 'exercise_complete' : 'exercise_attempt',
+        activityType:'exercise_complete',
         subject: subject,
         chapterId: chapterId,
         lessonId: lessonId,
         exerciseId: exerciseId,
-        score: isCorrect ? 100 : 0, // Score based on correctness
+        score: 100,
         timeSpent: timeSpent,
         metadata: {
           exerciseType: exercise.type,
           points: exercise.points,
-          solutionLength: userSolution.length,
-          isCorrect: isCorrect
+          isCorrect: true
         }
       });
       
+      // Update assignment status if this exercise is part of an assignment
+      const currentAssignment = assignments.find(a => a.exercise?.id === exerciseId);
+      if (currentAssignment) {
+        await axiosPrivate.post(`/courses/student/assignments/${currentAssignment._id}`, {
+          status: 'completed'
+        });
+      }
+      
+      // Update local state to reflect completion
+      setExercise(prev => ({ ...prev, completed: true }));
       setSubmitted(true);
-      toast.success(isCorrect 
-        ? "Solution correcte soumise avec succès!" 
-        : "Solution soumise. Consultez la solution modèle pour vous améliorer.");
+      toast.success("Exercice marqué comme terminé!");
+      
     } catch (err) {
-      console.error("Error submitting solution:", err);
-      toast.error("Erreur lors de la soumission de votre solution");
+      console.error("Error marking exercise as done:", err);
+      toast.error("Erreur lors de la validation de l'exercice");
     }
   };
 
-  // Fetch exercise data if not provided as prop
+  // Fetch exercise data
   useEffect(() => {
+    const fetchAssignments = async () => {
+      try {
+        if(assignments.length > 0) {
+          return;
+        }
+        const response = await axiosPrivate.get(`/courses/student/assignments`);
+        const assignmentsData = response.data.assignments;
+        useCourseStore.setState({ assignments: assignmentsData });
+      } catch (error) {
+        console.error("Error fetching assignments:", error);
+      }
+    };
     const fetchExercise = async () => {
       setLoading(true);
       try {
         const response = await axiosPrivate.get(`/courses/student/lessons/${lessonId}/exercises/${exerciseId}`);
-        console.log(response.data)
         if (response.data) {
-          setExercise(response.data.exercise);
+          // Check if exercise is completed from analytics
+          const completedResponse = await axiosPrivate.get(`courses/analytics/exercises/${lessonId}?activityType=exercise_complete`);
+          const completedExerciseIds = completedResponse.data && Array.isArray(completedResponse.data) 
+            ? completedResponse.data.map(activity => activity.exerciseId) 
+            : [];
+          
+          const isCompleted = completedExerciseIds.includes(exerciseId);
+          
+          setExercise({
+            ...response.data.exercise,
+            completed: isCompleted
+          });
+          
+          // Set submitted state if already completed
+          setSubmitted(isCompleted);
+          
+          // Check if this exercise is part of assignments and track accordingly
+          const assignmentExerciseIds = assignments.map(a => a.exercise?.id).filter(Boolean);
+          const currentAssignment = assignments.find(a => a.exercise?.id === exerciseId);
+          
+          if (assignmentExerciseIds.includes(exerciseId) && currentAssignment) {
+            // Only track attempt and update status if not already completed
+            if (!isCompleted && currentAssignment.status !== 'completed') {
+              await axiosPrivate.post(`/courses/analytics/track`, {
+                activityType: 'exercise_attempt',
+                subject: subject,
+                chapterId: chapterId,
+                lessonId: lessonId,
+                exerciseId: exerciseId,
+                score: 0,
+                timeSpent: 0,
+                metadata: {
+                  exerciseType: response.data.exercise.type,
+                  points: response.data.exercise.points,
+                }
+              });
+              
+              await axiosPrivate.post(`/courses/student/assignments/${currentAssignment._id}`, {
+                status: 'in_progress'
+              });
+            }
+          }
         }
       } catch (err) {
         console.error("Error fetching exercise:", err);
@@ -76,12 +134,10 @@ function ExercisePage() {
         setLoading(false);
       }
     };
+    
     fetchExercise();
+    fetchAssignments();
   }, [lessonId, exerciseId]);
-
-  const handleShowSolution = () => {
-    setShowSolution(true);
-  };
 
   const getExerciseTypeIcon = (type) => {
     switch (type) {
@@ -151,7 +207,7 @@ function ExercisePage() {
 
   return (
     <div className="container mx-auto p-6">
-      {/* Exercise header with back button and type badge */}
+      {/* Exercise header with back button and badges */}
       <div className="flex justify-between items-center mb-6">
         <Button 
           variant="ghost" 
@@ -161,21 +217,46 @@ function ExercisePage() {
           <ArrowLeft className="h-4 w-4 mr-2" />
           Retour aux exercices
         </Button>
-        <Badge variant="outline" className="flex items-center gap-1">
-          {getExerciseTypeIcon(exercise.type)}
-          {getExerciseTypeLabel(exercise.type)}
-        </Badge>
+        <div className="flex items-center gap-2">
+          {/* Assignment indicator */}
+          {isAssignmentExercise && (
+            <Badge variant="secondary" className="flex items-center gap-1 bg-blue-100 text-blue-800 border-blue-200">
+              <BookOpen className="h-3 w-3" />
+              Devoir
+            </Badge>
+          )}
+          {/* Exercise type badge */}
+          <Badge variant="outline" className="flex items-center gap-1">
+            {getExerciseTypeIcon(exercise.type)}
+            {getExerciseTypeLabel(exercise.type)}
+          </Badge>
+        </div>
       </div>
 
       {/* Exercise title, description and progress */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">{exercise.title}</h1>
+        <div className="flex items-center gap-2 mb-2">
+          <h1 className="text-3xl font-bold">{exercise.title}</h1>
+          {isAssignmentExercise && (
+            <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+              Assigné
+            </Badge>
+          )}
+        </div>
         {exercise.description && (
           <p className="text-muted-foreground mb-4">{exercise.description}</p>
         )}
-        <div className="flex items-center text-sm text-muted-foreground">
-          <Award className="h-4 w-4 mr-1 text-amber-400" />
-          Points: {exercise.points || 10}
+        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          <div className="flex items-center">
+            <Award className="h-4 w-4 mr-1 text-amber-400" />
+            Points: {exercise.points || 10}
+          </div>
+          {isAssignmentExercise && currentAssignment && (
+            <div className="flex items-center text-blue-600">
+              <BookOpen className="h-4 w-4 mr-1" />
+              Échéance: {new Date(currentAssignment.dueDate).toLocaleDateString('fr-FR')}
+            </div>
+          )}
         </div>
       </div>
 
@@ -200,63 +281,30 @@ function ExercisePage() {
           )}
         </CardHeader>
         <CardContent>
-          <div className="prose dark:prose-invert max-w-none">
-            <div dangerouslySetInnerHTML={{ __html: exercise.content }} />
+          <div className="flex justify-center items-center">
+            {exercise.content.imageUrl ? 
+              <img src={exercise.content.imageUrl} alt="" /> :
+              <div dangerouslySetInnerHTML={{ __html: exercise.content.text }} />
+            } 
           </div>
         </CardContent>
       </Card>
 
-      {/* Solution input */}
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle>Votre Solution</CardTitle>
-          <CardDescription>
-            {exercise.type === 'coding' 
-              ? "Écrivez votre code ici. Assurez-vous qu'il répond à toutes les exigences."
-              : "Rédigez votre réponse ici en suivant les instructions."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Textarea
-            placeholder={
-              exercise.type === 'coding' 
-                ? "// Entrez votre code ici" 
-                : exercise.type === 'written'
-                  ? "Rédigez votre réponse ici..."
-                  : "Décrivez votre solution ici..."
-            }
-            className="min-h-[200px] font-mono"
-            value={userSolution}
-            onChange={(e) => setUserSolution(e.target.value)}
-            disabled={submitted}
-          />
-        </CardContent>
-        <CardFooter className="flex justify-between">
-          {!submitted ? (
-            <Button onClick={handleSubmit} className="w-full">
-              Soumettre la solution
-            </Button>
-          ) : (
-            <div className="w-full flex items-center justify-center p-2 bg-green-50 dark:bg-green-900/20 rounded-md">
-              <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
-              <span>Solution soumise avec succès!</span>
-            </div>
-          )}
-        </CardFooter>
-      </Card>
-
-      {/* Model solution (shown only after submission or when requested) */}
-      {(submitted || showSolution) && exercise.solution && (
-        <Card>
+      {/* Solution card - only show if showSolution is true */}
+      {showSolution && exercise.solution && (
+        <Card className="mb-8 border-green-200 bg-background">
           <CardHeader>
-            <CardTitle>Solution modèle</CardTitle>
-            <CardDescription>
-              Voici une solution de référence pour cet exercice.
+            <CardTitle className="text-green-800">Solution</CardTitle>
+            <CardDescription className="text-green-600">
+              Voici la solution de cet exercice.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="bg-muted p-4 rounded-md font-mono whitespace-pre-wrap">
-              {exercise.solution}
+            <div className="text-green-900 flex justify-center items-center">
+              {exercise.solution.imageUrl ? 
+                <img src={exercise.solution.imageUrl} alt="Solution" className="max-w-full h-auto" /> :
+                <div dangerouslySetInnerHTML={{ __html: exercise.solution.text }} />
+              }
             </div>
           </CardContent>
         </Card>
@@ -273,25 +321,48 @@ function ExercisePage() {
           Retour aux exercices
         </Button>
         
-        {!submitted && !showSolution && exercise.solution && (
-          <Button 
-            variant="outline"
-            onClick={handleShowSolution}
-            className="flex items-center"
-          >
-            Voir la solution
-          </Button>
-        )}
-        
-        {submitted && (
-          <Button 
-            onClick={() => navigate(`/student/courses/${subject}/chapters/${chapterId}/lessons/${lessonId}?tab=exercises`)}
-            className="flex items-center"
-          >
-            Continuer
-            <ArrowRight className="h-4 w-4 ml-2" />
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {/* Show Solution button */}
+          {exercise.solution && (
+            <Button 
+              variant="outline"
+              onClick={() => setShowSolution(!showSolution)}
+              className="flex items-center"
+            >
+              <Eye className="h-4 w-4 mr-2" />
+              {showSolution ? 'Masquer la solution' : 'Voir la solution'}
+            </Button>
+          )}
+         
+          {exercise.completed ? (
+              <Button 
+                variant="outline"
+                disabled
+                className="flex items-center text-green-600 border-green-600"
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Déjà Terminé
+              </Button>
+            ) : (
+              <Button 
+                onClick={handleMarkDone}
+                className="flex items-center"
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Marquer comme terminé
+              </Button>
+            )}
+            
+          {(submitted || exercise.completed) && (
+            <Button 
+              onClick={() => navigate(`/student/courses/${subject}/chapters/${chapterId}/lessons/${lessonId}?tab=exercises`)}
+              className="flex items-center"
+            >
+              Continuer
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          )} 
+        </div>
       </div>
     </div>
   );

@@ -11,9 +11,10 @@ function QuizzesForm({
   currentLesson, 
   updateCurrentLesson 
 }) {
+  console.log(currentLesson)
   const addQuiz = () => {
     const newQuiz = {
-      id: Date.now().toString(),
+      _id: Date.now().toString(),
       title: '',
       description: '',
       timeLimit: 10,
@@ -28,7 +29,7 @@ function QuizzesForm({
   
   const updateQuiz = (id, data) => {
     const updatedQuizzes = (currentLesson.quizzes || []).map(quiz => 
-      quiz.id === id ? { ...quiz, ...data } : quiz
+      quiz._id === id ? { ...quiz, ...data } : quiz
     );
     
     updateCurrentLesson({ quizzes: updatedQuizzes });
@@ -36,7 +37,7 @@ function QuizzesForm({
   
   const removeQuiz = (id) => {
     const updatedQuizzes = (currentLesson.quizzes || []).filter(
-      quiz => quiz.id !== id
+      quiz => quiz._id !== id
     );
     
     updateCurrentLesson({ quizzes: updatedQuizzes });
@@ -44,18 +45,18 @@ function QuizzesForm({
   };
   
   const addQuestion = (quizId) => {
-    const quiz = currentLesson.quizzes.find(q => q.id === quizId);
+    const quiz = currentLesson.quizzes.find(q => q._id === quizId);
     if (!quiz) return;
     
     const newQuestion = {
-      id: Date.now().toString(),
+      _id: Date.now().toString(),
       text: '',
       type: 'multiple-choice',
       options: [
-        { id: '1', text: 'Option 1', isCorrect: false },
-        { id: '2', text: 'Option 2', isCorrect: false },
-        { id: '3', text: 'Option 3', isCorrect: false },
-        { id: '4', text: 'Option 4', isCorrect: false }
+        { _id: '1', text: 'Option 1', isCorrect: false },
+        { _id: '2', text: 'Option 2', isCorrect: false },
+        { _id: '3', text: 'Option 3', isCorrect: false },
+        { _id: '4', text: 'Option 4', isCorrect: false }
       ],
       points: 1
     };
@@ -65,22 +66,22 @@ function QuizzesForm({
   };
   
   const updateQuestion = (quizId, questionId, data) => {
-    const quiz = currentLesson.quizzes.find(q => q.id === quizId);
+    const quiz = currentLesson.quizzes.find(q => q._id === quizId);
     if (!quiz) return;
     
     const updatedQuestions = (quiz.questions || []).map(question => 
-      question.id === questionId ? { ...question, ...data } : question
+      question._id === questionId ? { ...question, ...data } : question
     );
     
     updateQuiz(quizId, { questions: updatedQuestions });
   };
   
   const removeQuestion = (quizId, questionId) => {
-    const quiz = currentLesson.quizzes.find(q => q.id === quizId);
+    const quiz = currentLesson.quizzes.find(q => q._id === quizId);
     if (!quiz) return;
     
     const updatedQuestions = (quiz.questions || []).filter(
-      question => question.id !== questionId
+      question => question._id !== questionId
     );
     
     updateQuiz(quizId, { questions: updatedQuestions });
@@ -88,14 +89,14 @@ function QuizzesForm({
   };
   
   const updateOption = (quizId, questionId, optionId, data) => {
-    const quiz = currentLesson.quizzes.find(q => q.id === quizId);
+    const quiz = currentLesson.quizzes.find(q => q._id === quizId);
     if (!quiz) return;
     
-    const question = quiz.questions.find(q => q.id === questionId);
+    const question = quiz.questions.find(q => q._id === questionId);
     if (!question) return;
     
     const updatedOptions = question.options.map(option => 
-      option.id === optionId ? { ...option, ...data } : option
+      option._id === optionId ? { ...option, ...data } : option
     );
     
     updateQuestion(quizId, questionId, { options: updatedOptions });
@@ -123,13 +124,13 @@ function QuizzesForm({
       ) : (
         <div className="space-y-6">
           {currentLesson.quizzes.map((quiz, quizIndex) => (
-            <div key={quiz.id} className="border rounded-md p-4 space-y-4">
+            <div key={quiz._id} className="border rounded-md p-4 space-y-4">
               <div className="flex justify-between items-center">
                 <h5 className="font-medium">Quiz {quizIndex + 1}: {quiz.title || 'Untitled Quiz'}</h5>
                 <Button 
                   variant="ghost" 
                   size="icon" 
-                  onClick={() => removeQuiz(quiz.id)}
+                  onClick={() => removeQuiz(quiz._id)}
                 >
                   <Trash2 className="h-4 w-4 text-red-500" />
                 </Button>
@@ -137,47 +138,47 @@ function QuizzesForm({
               
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor={`quiz-title-${quiz.id}`}>Title</Label>
+                  <Label htmlFor={`quiz-title-${quiz._id}`}>Title</Label>
                   <Input 
-                    id={`quiz-title-${quiz.id}`}
+                    id={`quiz-title-${quiz._id}`}
                     value={quiz.title} 
-                    onChange={(e) => updateQuiz(quiz.id, { title: e.target.value })} 
+                    onChange={(e) => updateQuiz(quiz._id, { title: e.target.value })} 
                     placeholder="e.g. Chapter 1 Assessment"
                   />
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor={`quiz-time-${quiz.id}`}>Time Limit (minutes)</Label>
+                  <Label htmlFor={`quiz-time-${quiz._id}`}>Time Limit (minutes)</Label>
                   <Input 
-                    id={`quiz-time-${quiz.id}`}
+                    id={`quiz-time-${quiz._id}`}
                     type="number" 
                     min="1" 
                     value={quiz.timeLimit} 
-                    onChange={(e) => updateQuiz(quiz.id, { timeLimit: parseInt(e.target.value) || 10 })} 
+                    onChange={(e) => updateQuiz(quiz._id, { timeLimit: parseInt(e.target.value) || 10 })} 
                   />
                 </div>
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor={`quiz-description-${quiz.id}`}>Description</Label>
+                <Label htmlFor={`quiz-description-${quiz._id}`}>Description</Label>
                 <Textarea 
-                  id={`quiz-description-${quiz.id}`}
+                  id={`quiz-description-${quiz._id}`}
                   value={quiz.description} 
-                  onChange={(e) => updateQuiz(quiz.id, { description: e.target.value })} 
+                  onChange={(e) => updateQuiz(quiz._id, { description: e.target.value })} 
                   placeholder="Instructions for students taking this quiz"
                   rows={2}
                 />
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor={`quiz-passing-${quiz.id}`}>Passing Score (%)</Label>
+                <Label htmlFor={`quiz-passing-${quiz._id}`}>Passing Score (%)</Label>
                 <Input 
-                  id={`quiz-passing-${quiz.id}`}
+                  id={`quiz-passing-${quiz._id}`}
                   type="number" 
                   min="0" 
                   max="100" 
                   value={quiz.passingScore} 
-                  onChange={(e) => updateQuiz(quiz.id, { passingScore: parseInt(e.target.value) || 70 })} 
+                  onChange={(e) => updateQuiz(quiz._id, { passingScore: parseInt(e.target.value) || 70 })} 
                 />
               </div>
               
@@ -188,7 +189,7 @@ function QuizzesForm({
                     type="button" 
                     variant="outline" 
                     size="sm" 
-                    onClick={() => addQuestion(quiz.id)}
+                    onClick={() => addQuestion(quiz._id)}
                   >
                     <Plus className="mr-2 h-4 w-4" />
                     Add Question
@@ -202,24 +203,24 @@ function QuizzesForm({
                 ) : (
                   <div className="space-y-4">
                     {quiz.questions.map((question, questionIndex) => (
-                      <div key={question.id} className="border rounded-md p-3 space-y-3 bg-muted/20">
+                      <div key={question._id} className="border rounded-md p-3 space-y-3 bg-muted/20">
                         <div className="flex justify-between items-center">
                           <h6 className="font-medium text-sm">Question {questionIndex + 1}</h6>
                           <Button 
                             variant="ghost" 
                             size="icon" 
-                            onClick={() => removeQuestion(quiz.id, question.id)}
+                            onClick={() => removeQuestion(quiz._id, question._id)}
                           >
                             <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
                         </div>
                         
                         <div className="space-y-2">
-                          <Label htmlFor={`question-text-${question.id}`}>Question</Label>
+                          <Label htmlFor={`question-text-${question._id}`}>Question</Label>
                           <Textarea 
-                            id={`question-text-${question.id}`}
+                            id={`question-text-${question._id}`}
                             value={question.text} 
-                            onChange={(e) => updateQuestion(quiz.id, question.id, { text: e.target.value })} 
+                            onChange={(e) => updateQuestion(quiz._id, question._id, { text: e.target.value })} 
                             placeholder="Enter your question here"
                             rows={2}
                           />
@@ -229,20 +230,20 @@ function QuizzesForm({
                           <Label>Answer Options</Label>
                           <div className="space-y-2">
                             {question.options.map((option) => (
-                              <div key={option.id} className="flex items-center space-x-2">
+                              <div key={option._id} className="flex items-center space-x-2">
                                 <Checkbox 
-                                  id={`option-correct-${option.id}`}
+                                  id={`option-correct-${option._id}`}
                                   checked={option.isCorrect}
                                   onCheckedChange={(checked) => 
-                                    updateOption(quiz.id, question.id, option.id, { isCorrect: !!checked })
+                                    updateOption(quiz._id, question._id, option._id, { isCorrect: !!checked })
                                   }
                                 />
                                 <Input 
                                   value={option.text} 
                                   onChange={(e) => 
-                                    updateOption(quiz.id, question.id, option.id, { text: e.target.value })
+                                    updateOption(quiz._id, question._id, option._id, { text: e.target.value })
                                   } 
-                                  placeholder={`Option ${option.id}`}
+                                  placeholder={`Option ${option._id}`}
                                   className="flex-1"
                                 />
                               </div>
@@ -252,13 +253,13 @@ function QuizzesForm({
                         </div>
                         
                         <div className="space-y-2">
-                          <Label htmlFor={`question-points-${question.id}`}>Points</Label>
+                          <Label htmlFor={`question-points-${question._id}`}>Points</Label>
                           <Input 
-                            id={`question-points-${question.id}`}
+                            id={`question-points-${question._id}`}
                             type="number" 
                             min="1" 
                             value={question.points} 
-                            onChange={(e) => updateQuestion(quiz.id, question.id, { points: parseInt(e.target.value) || 1 })} 
+                            onChange={(e) => updateQuestion(quiz._id, question._id, { points: parseInt(e.target.value) || 1 })} 
                             className="w-24"
                           />
                         </div>

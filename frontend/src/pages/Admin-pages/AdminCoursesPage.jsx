@@ -220,7 +220,7 @@ function AdminCoursesPage() {
                 selectedGrade={selectedGrade}
                 selectedSubject={selectedSubject}
                 statusFilter={statusFilter}
-                onRowClick={(course) => navigate(`/admin/courses/${course.id}/view`)}
+                onRowClick={(course) => navigate(`/${auth.user.role}/courses/${course.id}/view`)}
               />
             </TabsContent>
             <TabsContent value="published" className="m-0">

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { io } from 'socket.io-client';
 import { axiosPrivate } from '@/api/axios';
+import { uploadToCloudinary, uploadToCloudinaryWithProgress } from '@/config/cloudinary';
 
 const useMessageStore = create((set, get) => ({
   // State
@@ -250,7 +251,8 @@ const useMessageStore = create((set, get) => ({
   },
   
   // Upload attachment and send message with attachment
-  uploadAttachment: async (file, type = 'file') => {
+  // Updated uploadAttachment function for direct Cloudinary upload
+  uploadAttachment: async (file, type = 'file', onProgress = null) => {
     const { socket, selectedContact, sendMessage } = get();
     
     if (!socket || !selectedContact) {
@@ -259,52 +261,106 @@ const useMessageStore = create((set, get) => ({
     }
     
     try {
-      // Create form data for file upload
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('type', type);
-      formData.append('recipientId', selectedContact.id);
-      formData.append('isGroup', selectedContact.isGroup ? 'true' : 'false');
+      // Upload directly to Cloudinary
+      const uploadOptions = {
+        folder: 'messages_attachments',
+        publicId: `attachment_${Date.now()}_${selectedContact.id}`
+      };
       
-      // Upload the file to the server
-      const response = await axiosPrivate.post('/chat/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
-      
-      // Get the file URL from the response
-      const { fileUrl, fileName } = response.data;
+      let uploadResult;
+      if (onProgress) {
+        uploadResult = await uploadToCloudinaryWithProgress(file, uploadOptions, onProgress);
+      } else {
+        uploadResult = await uploadToCloudinary(file, uploadOptions);
+      }
       
       // Create attachment object
       const attachment = {
-        url: fileUrl,
-        name: fileName || file.name,
+        url: uploadResult.fileUrl,
+        name: uploadResult.fileName,
         type: type === 'image' ? 'image' : 'file',
-        size: file.size
+        size: uploadResult.fileSize,
+        cloudinaryId: uploadResult.cloudinaryId,
+        ...(uploadResult.width && { width: uploadResult.width }),
+        ...(uploadResult.height && { height: uploadResult.height })
       };
       
       // Send message with attachment
       const content = type === 'image' ? 'Image' : 'Fichier';
-      const message = sendMessage(content, 'text');
-      
-      // Update the message with attachment info
-      const { messages } = get();
-      const contactId = selectedContact.id;
-      const updatedMessages = {
-        ...messages,
-        [contactId]: messages[contactId].map(msg => 
-          msg.id === message.id ? { ...msg, attachment } : msg
-        )
-      };
-      
-      set({ messages: updatedMessages });
+      const message = sendMessage(content, type, attachment);
       
       return { message, attachment };
     } catch (error) {
       console.error('Error uploading attachment:', error);
       return null;
     }
+  },
+
+  // Enhanced sendMessage to handle attachments
+  sendMessage: (content, type = 'text', attachment = null) => {
+    const { socket, selectedContact, messages } = get();
+    
+    if (!socket || !selectedContact) {
+      console.error('Cannot send message: No socket or selected contact');
+      return;
+    }
+    
+    // Get user ID from socket auth
+    const senderId = socket.auth.userId;
+    
+    const messageData = {
+      content,
+      type,
+      timestamp: new Date().toISOString(),
+      senderId: senderId,
+      senderRole: socket.auth.role,
+      ...(attachment && { attachment })
+    };
+    
+    // Handle group messages differently
+    if (selectedContact.isGroup) {
+      messageData.groupId = selectedContact.id;
+      messageData.isGroupMessage = true;
+      messageData.recipientId = selectedContact.id;
+      socket.emit('send_group_message', messageData);
+    } else {
+      messageData.recipientId = selectedContact.id;
+      socket.emit('send_message', messageData);
+    }
+    
+    // Optimistically add message to local state
+    const contactId = selectedContact.id;
+    const newMessage = {
+      ...messageData,
+      id: Date.now().toString(),
+      sent: true,
+      delivered: false,
+      read: false,
+    };
+    
+    // Create a new messages object with the updated messages array
+    const updatedMessages = {
+      ...messages,
+      [contactId]: [...(messages[contactId] || []), newMessage]
+    };
+    
+    // Update messages state
+    set({ messages: updatedMessages });
+    
+    // Update the contact's lastMessage
+    const { contacts } = get();
+    const updatedContacts = contacts.map(contact => {
+      if (contact.id === contactId) {
+        return { 
+          ...contact, 
+          lastMessage: attachment ? `📎 ${attachment.name}` : content 
+        };
+      }
+      return contact;
+    });
+    set({ contacts: updatedContacts });
+    
+    return newMessage;
   },
   
   // Mark messages as read

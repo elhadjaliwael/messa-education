@@ -3,7 +3,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Send, Paperclip, Smile, ImageIcon } from "lucide-react"
+import { Send, Paperclip, Smile, ImageIcon, X, FileText } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Menu } from "lucide-react"
 import useMessageStore from "@/store/messageStore"
@@ -20,21 +20,36 @@ function MessagesChatArea({ selectedContact, onOpenSidebar, isMobile }) {
   const imageInputRef = useRef(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   
+  // State for pending attachment (Messenger-style)
+  const [pendingAttachment, setPendingAttachment] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+  
   // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
   
-  const handleSendMessage = () => {
-    if (!messageText.trim()) return;
+  const handleSendMessage = async () => {
+    if (!messageText.trim() && !pendingAttachment) return;
     
-    // Prevent duplicate messages by disabling the button temporarily
-    const trimmedMessage = messageText.trim();
-    setMessageText('');
+    setIsUploading(true);
     
-    // Only send the message if it's not empty
-    if (trimmedMessage) {
-      sendMessage(trimmedMessage);
+    try {
+      if (pendingAttachment) {
+        // Send message with attachment
+        await sendMessage(messageText.trim() || '', pendingAttachment.file, pendingAttachment.type);
+        setPendingAttachment(null);
+      } else {
+        // Send text-only message
+        await sendMessage(messageText.trim());
+      }
+      
+      setMessageText('');
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      alert('Échec de l\'envoi du message. Veuillez réessayer.');
+    } finally {
+      setIsUploading(false);
     }
   };
   
@@ -56,7 +71,20 @@ function MessagesChatArea({ selectedContact, onOpenSidebar, isMobile }) {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      uploadAttachment(file, 'file');
+      // Validate file size (10MB limit)
+      if (file.size > 10 * 1024 * 1024) {
+        alert('Le fichier est trop volumineux. Taille maximale: 10MB');
+        e.target.value = '';
+        return;
+      }
+      
+      setPendingAttachment({
+        file,
+        type: 'file',
+        name: file.name,
+        size: (file.size / 1024 / 1024).toFixed(2) + ' MB'
+      });
+      
       e.target.value = '';
     }
   };
@@ -64,9 +92,39 @@ function MessagesChatArea({ selectedContact, onOpenSidebar, isMobile }) {
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      uploadAttachment(file, 'image');
+      // Validate file size (5MB limit for images)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('L\'image est trop volumineuse. Taille maximale: 5MB');
+        e.target.value = '';
+        return;
+      }
+      
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        alert('Veuillez sélectionner un fichier image valide.');
+        e.target.value = '';
+        return;
+      }
+      
+      // Create image preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setPendingAttachment({
+          file,
+          type: 'image',
+          name: file.name,
+          size: (file.size / 1024 / 1024).toFixed(2) + ' MB',
+          preview: e.target.result
+        });
+      };
+      reader.readAsDataURL(file);
+      
       e.target.value = '';
     }
+  };
+  
+  const removePendingAttachment = () => {
+    setPendingAttachment(null);
   };
   
   const handleEmojiClick = (emoji) => {
@@ -234,104 +292,160 @@ function MessagesChatArea({ selectedContact, onOpenSidebar, isMobile }) {
             </div>
           </ScrollArea>
 
-          <div className="border-t p-4 dark:border-slate-800 bg-slate-50 dark:bg-slate-900">
-            <div className="flex gap-2 relative">
-              <div className="flex gap-2">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="rounded-full"
-                        onClick={handleFileAttachment}
-                      >
-                        <Paperclip className="h-5 w-5 text-slate-500" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Joindre un fichier</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  onChange={handleFileChange} 
-                  className="hidden" 
-                />
-
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="rounded-full"
-                        onClick={handleImageAttachment}
-                      >
-                        <ImageIcon className="h-5 w-5 text-slate-500" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Envoyer une image</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                <input 
-                  type="file" 
-                  accept="image/*" 
-                  ref={imageInputRef} 
-                  onChange={handleImageChange} 
-                  className="hidden" 
-                />
-
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="rounded-full"
-                        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                      >
-                        <Smile className="h-5 w-5 text-slate-500" />
-                        {showEmojiPicker && (
-                          <div className="p-2 bg-white dark:bg-slate-800 absolute bottom-12 left-0 rounded-md shadow-md z-10">
-                            <div className="grid grid-cols-4 gap-2">
-                              {['😊', '😂', '❤️', '👍', '🎉', '🙏', '💯', '🔥', 
-                                '😍', '😎', '🤔', '😢', '😭', '😡', '🥳', '😴'].map(emoji => (
-                                <div
-                                  key={emoji}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleEmojiClick(emoji);
-                                  }}
-                                  className="text-xl hover:bg-slate-100 dark:hover:bg-slate-700 p-1 rounded cursor-pointer"
-                                >
-                                  {emoji}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Insérer un emoji</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+          <div className="border-t dark:border-slate-800 bg-slate-50 dark:bg-slate-900">
+            {/* Messenger-style attachment preview above input */}
+            {pendingAttachment && (
+              <div className="p-3 border-b dark:border-slate-800">
+                <div className="flex items-center gap-3 bg-white dark:bg-slate-800 rounded-lg p-3 border border-slate-200 dark:border-slate-700">
+                  <div className="flex-shrink-0">
+                    {pendingAttachment.type === 'image' ? (
+                      pendingAttachment.preview ? (
+                        <img 
+                          src={pendingAttachment.preview} 
+                          alt="Preview" 
+                          className="w-12 h-12 object-cover rounded-md"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-md flex items-center justify-center">
+                          <ImageIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                        </div>
+                      )
+                    ) : (
+                      <div className="w-12 h-12 bg-slate-100 dark:bg-slate-700 rounded-md flex items-center justify-center">
+                        <FileText className="h-6 w-6 text-slate-600 dark:text-slate-400" />
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
+                      {pendingAttachment.name}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {pendingAttachment.size}
+                    </p>
+                  </div>
+                  
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={removePendingAttachment}
+                    className="flex-shrink-0 h-8 w-8 p-0 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-              <Input
-                placeholder="Écrivez votre message..."
-                value={messageText}
-                onChange={(e) => setMessageText(e.target.value)}
-                onKeyDown={handleKeyPress}
-                className="flex-1 bg-white dark:bg-slate-800"
-              />
-              <Button 
-                className="rounded-full" 
-                size="icon" 
-                disabled={!messageText.trim()}
-                onClick={handleSendMessage}
-              >
-                <Send className="h-5 w-5" />
-              </Button>
+            )}
+            
+            {/* Message input area */}
+            <div className="p-4">
+              <div className="flex items-end gap-2 relative">
+                <div className="flex gap-1 flex-shrink-0">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="rounded-full h-9 w-9"
+                          onClick={handleFileAttachment}
+                          disabled={isUploading}
+                        >
+                          <Paperclip className="h-4 w-4 text-slate-500" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Joindre un fichier (max 10MB)</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={handleFileChange} 
+                    className="hidden"
+                    accept=".pdf,.doc,.docx,.txt,.zip,.rar,.ppt,.pptx,.xls,.xlsx"
+                  />
+
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="rounded-full h-9 w-9"
+                          onClick={handleImageAttachment}
+                          disabled={isUploading}
+                        >
+                          <ImageIcon className="h-4 w-4 text-slate-500" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Envoyer une image (max 5MB)</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    ref={imageInputRef} 
+                    onChange={handleImageChange} 
+                    className="hidden" 
+                  />
+
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="rounded-full h-9 w-9"
+                          onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                        >
+                          <Smile className="h-4 w-4 text-slate-500" />
+                          {showEmojiPicker && (
+                            <div className="p-2 bg-white dark:bg-slate-800 absolute bottom-12 left-0 rounded-md shadow-md z-10">
+                              <div className="grid grid-cols-4 gap-2">
+                                {['😊', '😂', '❤️', '👍', '🎉', '🙏', '💯', '🔥', 
+                                  '😍', '😎', '🤔', '😢', '😭', '😡', '🥳', '😴'].map(emoji => (
+                                  <div
+                                    key={emoji}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleEmojiClick(emoji);
+                                    }}
+                                    className="text-xl hover:bg-slate-100 dark:hover:bg-slate-700 p-1 rounded cursor-pointer"
+                                  >
+                                    {emoji}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Insérer un emoji</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                
+                <div className="flex-1 min-w-0">
+                  <Input
+                    placeholder="Écrivez votre message..."
+                    value={messageText}
+                    onChange={(e) => setMessageText(e.target.value)}
+                    onKeyDown={handleKeyPress}
+                    className="bg-white dark:bg-slate-800 h-9"
+                    disabled={isUploading}
+                  />
+                </div>
+                
+                <Button 
+                  className="rounded-full h-9 w-9 flex-shrink-0" 
+                  size="icon" 
+                  disabled={(!messageText.trim() && !pendingAttachment) || isUploading}
+                  onClick={handleSendMessage}
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
         </>

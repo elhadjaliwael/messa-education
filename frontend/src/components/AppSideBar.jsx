@@ -18,8 +18,8 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
   } from "@/components/ui/sidebar"
+  import logo from "@/assets/logo.png"
   import useAuth from "../hooks/useAuth"
-
   
   export default function AppSidebar({ role = "student", ...props }) {
     const { user, logout } = useAuth()
@@ -131,9 +131,15 @@ import {
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton size="lg" asChild>
-                <a href="/">
-                  <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                    <Command className="size-4" />
+                <a href={`/${role}`}>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-green-400 to-yellow-400 p-1 shadow-sm">
+                      <img 
+                        src={logo} 
+                        alt="Messa Education Logo" 
+                        className="h-full w-full object-contain"
+                      />
+                    </div>
                   </div>
                   <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-semibold">Messa Education</span>

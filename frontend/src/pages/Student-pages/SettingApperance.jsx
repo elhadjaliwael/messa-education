@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { use, useEffect } from 'react'
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,12 +10,17 @@ import {toast} from'sonner'
 import { Loader2 } from 'lucide-react'
 import  useTheme  from '@/hooks/useTheme'
 function SettingApperance() {
+    const {setTheme,theme} = useTheme();
     const [appearance, setAppearance] = useState({
-        theme: "system",
+        theme,
         language: "fr",
         fontSize: "medium"
       })
-      const {setTheme} = useTheme();
+    useEffect(() => {
+      if(theme){
+        setAppearance({...appearance, theme})
+      }
+    },[theme])
       const [isAppearanceSaving, setIsAppearanceSaving] = useState(false)
       const saveAppearanceChanges = async () => {
         setIsAppearanceSaving(true)

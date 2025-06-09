@@ -2,14 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {  Award, Clock, ArrowRight, CheckCircle, RotateCw } from "lucide-react";
+import { Award, Clock, ArrowRight, CheckCircle, RotateCw, BookOpen } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { axiosPrivate } from '@/api/axios';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import useCourseStore  from '@/store/courseStore';
 
 function QuizzList({ quizzes, onSelectQuiz, completedQuizzes = [], lessonId }) {
   const [quizActivities, setQuizActivities] = useState({});
   const [loading, setLoading] = useState(false);
+  const { assignments } = useCourseStore();
 
   if (!quizzes || quizzes.length === 0) {
     return (
@@ -22,6 +24,18 @@ function QuizzList({ quizzes, onSelectQuiz, completedQuizzes = [], lessonId }) {
   }
 
   useEffect(() => {
+    const fetchAssignments = async () => {
+      try {
+        if(assignments.length > 0) {
+          return;
+        }
+        const response = await axiosPrivate.get(`/courses/student/assignments`);
+        const assignmentsData = response.data.assignments;
+        useCourseStore.setState({ assignments: assignmentsData });
+      } catch (error) {
+        console.error("Error fetching assignments:", error);
+      }
+    };
     const fetchQuizActivities = async () => {
       setLoading(true);
       try {
@@ -58,6 +72,7 @@ function QuizzList({ quizzes, onSelectQuiz, completedQuizzes = [], lessonId }) {
     };
     
     fetchQuizActivities();
+    fetchAssignments();
   }, [quizzes, lessonId]);
 
   return (
@@ -81,11 +96,21 @@ function QuizzList({ quizzes, onSelectQuiz, completedQuizzes = [], lessonId }) {
             (a.score || 0) >= (quiz.passingScore || 70)
           );
           
+          // Check if this quiz is part of an assignment
+          const assignmentInfo = assignments?.find(assignment => 
+            assignment.quizz && assignment.quizz.id === quiz._id
+          );
+          const isAssignmentQuiz = !!assignmentInfo;
+          
           return (
             <Card 
               key={quiz._id} 
               className={`hover:shadow-md transition-all duration-200 ${
-                hasSuccessfulAttempt ? 'border-green-200 bg-green-50/30 dark:bg-green-900/10' : ''
+                hasSuccessfulAttempt 
+                  ? 'border-green-200 bg-green-50/30 dark:bg-green-900/10' 
+                  : isAssignmentQuiz 
+                    ? 'ring-1 ring-blue-200' 
+                    : ''
               }`}
             >
               <CardHeader className="pb-2 relative">
@@ -94,8 +119,30 @@ function QuizzList({ quizzes, onSelectQuiz, completedQuizzes = [], lessonId }) {
                     <CheckCircle className="h-5 w-5" />
                   </div>
                 )}
+                {isAssignmentQuiz && (
+                  <div className="absolute -top-2 -left-2 bg-blue-100 text-blue-700 rounded-full p-1 shadow-sm border border-blue-200">
+                    <BookOpen className="h-4 w-4" />
+                  </div>
+                )}
                 <div className="flex justify-between items-start">
-                  <CardTitle className="text-base">{quiz.title}</CardTitle>
+                  <div className="flex-1">
+          
+                    <CardTitle className="text-base flex items-center gap-2">
+                      {quiz.title}
+                        <div className="flex items-center gap-2 mb-1">
+                        {isAssignmentQuiz && (
+                          <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200 text-xs">
+                            Devoir
+                          </Badge>
+                        )}
+                      </div>
+                    </CardTitle>
+                    {isAssignmentQuiz && assignmentInfo && (
+                      <div className="text-xs text-blue-600 mb-1">
+                        Échéance: {new Date(assignmentInfo.dueDate).toLocaleDateString('fr-FR')}
+                      </div>
+                    )}
+                  </div>
                   <Badge variant="outline" className="flex items-center gap-1 bg-blue-50 text-blue-700 border-blue-200">
                     {quiz.questions?.length || 0} questions
                   </Badge>
@@ -114,6 +161,12 @@ function QuizzList({ quizzes, onSelectQuiz, completedQuizzes = [], lessonId }) {
                     <Award className="h-3 w-3 mr-1 text-amber-400" /> 
                     Score min: {quiz.passingScore || 70}%
                   </span>
+                  {isAssignmentQuiz && (
+                      <span className="flex items-center text-blue-600">
+                        <BookOpen className="h-3 w-3 mr-1" /> 
+                        Assigné
+                      </span>
+                  )}
                   {attempts > 0 && (
                     <TooltipProvider>
                       <Tooltip>

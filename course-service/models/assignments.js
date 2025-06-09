@@ -37,6 +37,11 @@ const assignmentSchema = new mongoose.Schema({
   },
   notes: {
     type: String
+  },
+  status: {
+    type: String,
+    enum: ['pending', 'completed', 'late','in_progress'],
+    default: 'pending'
   }
 });
 

@@ -2,7 +2,37 @@ import React from 'react'
 import { Outlet } from 'react-router-dom'
 import { SidebarProvider, SidebarTrigger, SidebarInset } from '@/components/ui/sidebar'
 import AppSideBar from '@/components/AppSideBar'
+import  useAuth  from '@/hooks/useAuth'
+import  useNotificationStore  from '@/store/notificationStore'
+import { useEffect, useRef } from 'react'
 function ParentPage() {
+  const {auth} = useAuth()
+  const {setupNotificationSocket,initializeNotificationSocket,disconnectNotificationSocket} = useNotificationStore()
+  const socketsInitialized = useRef(false);
+  
+  useEffect(() => {
+    if (!auth?.accessToken || !auth.user?.id) return;
+  
+    if (!socketsInitialized.current) {
+      const notifSocket = initializeNotificationSocket(auth);
+      notifSocket.connect(); // now safe
+      setupNotificationSocket(notifSocket);
+  
+      socketsInitialized.current = true;
+    }
+  
+    const handleBeforeUnload = () => {
+      disconnectNotificationSocket();
+      socketsInitialized.current = false;
+    };
+  
+    window.addEventListener("beforeunload", handleBeforeUnload);
+  
+    return () => {
+      handleBeforeUnload();
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [auth?.accessToken, auth?.user?.id]);
     return (
         <div>
           <SidebarProvider>

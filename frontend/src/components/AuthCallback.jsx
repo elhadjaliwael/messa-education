@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import useAuth from '../hooks/useAuth';
-import { axiosPrivate } from '../api/axios'; // Import your axios instance
+import { axiosPrivate } from '../api/axios';
 
 const AuthCallback = () => {
     const { setAuth } = useAuth();
@@ -11,10 +11,27 @@ const AuthCallback = () => {
     useEffect(() => {
         const handleCallback = async () => {
             try {
-                // Get token and role from URL parameters
+                // Get parameters from URL
                 const params = new URLSearchParams(location.search);
                 const token = params.get('token');
                 const role = params.get('role');
+                const isNewUser = params.get('isNewUser') === 'true';
+                const email = params.get('email');
+                const name = params.get('name');
+                const picture = params.get('picture');
+                
+                if (isNewUser) {
+                    // New user - redirect to complete registration page
+                    navigate('/complete-registration', {
+                        state: {
+                            email: decodeURIComponent(email || ''),
+                            name: decodeURIComponent(name || ''),
+                            picture: decodeURIComponent(picture || '')
+                        },
+                        replace: true
+                    });
+                    return;
+                }
                 
                 if (!token) {
                     console.error('No token found in callback URL');
@@ -22,7 +39,7 @@ const AuthCallback = () => {
                     return;
                 }
                 
-                // Use your axios instance with proper configuration
+                // Existing user - verify token and set auth
                 const response = await axiosPrivate.get('/auth/verify', {
                     headers: {
                         'Authorization': `Bearer ${token}`
@@ -42,13 +59,13 @@ const AuthCallback = () => {
                     navigate('/admin');
                 } else if (role === 'teacher') {
                     navigate('/teacher');
-                } else {
-                    // Default for students or other roles
+                } else if (role === 'parent')  {
+                    navigate('/parent');
+                }else{
                     navigate('/student');
                 }
             } catch (error) {
                 console.error('Auth callback error:', error);
-                // Log more details about the error
                 if (error.response) {
                     console.error('Error response:', error.response.status, error.response.data);
                 }

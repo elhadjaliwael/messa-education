@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState,useEffect } from 'react';
 import {toast} from 'sonner';
 import { axiosPrivate } from '@/api/axios';
 import BasicInfo from './BasicInfo';
@@ -14,6 +14,11 @@ function AddCourse() {
   // Get only what we need from the store for this component
   const courseData = useCourseStore(state => state.courseData);
   const resetCourseData = useCourseStore(state => state.resetCourseData);
+
+  useEffect(() => {
+    // Reset course data when component mounts
+    resetCourseData();
+  }, []);
   
   // Navigate to next step with validation
   const nextStep = () => {
@@ -67,9 +72,9 @@ function AddCourse() {
             cloudinaryUrl: lesson.cloudinaryUrl,
             isNew : true,
             cloudinaryPublicId: lesson.cloudinaryPublicId,
-            exercises: lesson.exercises || [],
-            quizzes: lesson.quizzes || [],
-            resources: lesson.resources || []
+            exercises: (lesson.exercises || []).map(({ _id, ...exercise }) => exercise),
+            quizzes: (lesson.quizzes || []).map(({ _id, ...quiz }) => quiz),
+            resources: (lesson.resources || []).map(({ _id, ...resource }) => resource)
           });
         }
       }

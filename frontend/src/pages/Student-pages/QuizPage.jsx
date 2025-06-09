@@ -5,13 +5,16 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, ArrowRight, Clock, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, ArrowRight, Clock, CheckCircle, XCircle, AlertTriangle, BookOpen } from "lucide-react";
 import { toast } from 'sonner';
 import { axiosPrivate } from '@/api/axios';
+import useCourseStore from '@/store/courseStore';
 
 function QuizPage() {
-  const { chapterId,subject, quizId, lessonId } = useParams();
+  const { chapterId, subject, quizId, lessonId } = useParams();
   const navigate = useNavigate();
+  const { assignments } = useCourseStore();
   const [quiz, setQuiz] = useState(null);
   const [loading, setLoading] = useState(true);
   const [currentQuestion, setCurrentQuestion] = useState(0);
@@ -23,7 +26,25 @@ function QuizPage() {
   const [startTime, setStartTime] = useState(null);
   const timerRef = useRef(null);
 
+  // Check if this quiz is part of an assignment
+  const assignmentInfo = assignments?.find(assignment => 
+    assignment.quizz && assignment.quizz.id === quizId
+  );
+  
+  const isAssignmentQuiz = !!assignmentInfo;
   useEffect(() => {
+    const fetchAssignments = async () => {
+      try {
+        if(assignments.length > 0) {
+          return;
+        }
+        const response = await axiosPrivate.get(`/courses/student/assignments`);
+        const assignmentsData = response.data.assignments;
+        useCourseStore.setState({ assignments: assignmentsData });
+      } catch (error) {
+        console.error("Error fetching assignments:", error);
+      }
+    };
     const fetchQuiz = async () => {
       setLoading(true);
       try {
@@ -70,7 +91,7 @@ function QuizPage() {
     };
 
     fetchQuiz();
-
+    fetchAssignments();
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
@@ -155,6 +176,7 @@ function QuizPage() {
 
     // Calculate time spent
     const timeSpent = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
+    const isPassed = finalScore >= quiz.passingScore;
 
     // Save quiz result to the API
     try {
@@ -165,19 +187,31 @@ function QuizPage() {
         chapterId,
         subject,
         timeSpent,
-        activityType: finalScore >= quiz.passingScore ? 'quiz_complete' : 'quiz_attempt',
+        activityType: isPassed ? 'quiz_complete' : 'quiz_attempt',
         answers: Object.keys(answers).map(questionId => ({
           questionId,
           answerId: answers[questionId],
           isCorrect: quiz.questions.find(q => q.id === questionId)?.correctAnswer === answers[questionId]
         }))
       });
+
+      // Track assignment status if this quiz is part of an assignment
+      if (isAssignmentQuiz && assignmentInfo && isPassed) {
+        try {
+          // Update assignment status to completed since quiz is the only activity
+          await axiosPrivate.post(`/courses/student/assignments/${assignmentInfo._id || assignmentInfo.id}`, {
+            status: 'completed'
+          });
+        } catch (error) {
+          console.error('Error updating assignment status:', error);
+        }
+      }
     } catch (error) {
       console.error("Error saving quiz results:", error);
     }
 
     // Show appropriate toast based on score
-    if (finalScore >= quiz.passingScore) {
+    if (isPassed) {
       toast.success(`Félicitations! Vous avez obtenu ${finalScore}%`);
     } else {
       toast.error(`Vous avez obtenu ${finalScore}%. Le score minimum requis est de ${quiz.passingScore}%`);
@@ -227,7 +261,33 @@ function QuizPage() {
         
         <Card className="max-w-2xl mx-auto">
           <CardHeader>
-            <CardTitle className="text-2xl">{quiz.title}</CardTitle>
+            <div className="flex items-center gap-2 mb-2">
+              {isAssignmentQuiz && (
+                <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200">
+                  <BookOpen className="h-3 w-3 mr-1" />
+                  Devoir
+                </Badge>
+              )}
+            </div>
+            <CardTitle className="text-2xl flex items-center gap-2">
+              {quiz.title}
+              {isAssignmentQuiz && (
+                <Badge variant="outline" className="text-blue-600 border-blue-300">
+                  Assigné
+                </Badge>
+              )}
+            </CardTitle>
+            {isAssignmentQuiz && assignmentInfo && (
+              <p className="text-sm text-muted-foreground mt-2">
+                Date limite: {new Date(assignmentInfo.dueDate).toLocaleDateString('fr-FR', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+              </p>
+            )}
           </CardHeader>
           <CardContent className="space-y-4">
             <p>{quiz.description || "Ce quiz vous permettra d'évaluer votre compréhension du sujet."}</p>

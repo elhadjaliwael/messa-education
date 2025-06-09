@@ -3,89 +3,97 @@ import bcrypt from 'bcrypt';
 import User from '../models/user.model.js';
 import dotenv from 'dotenv';
 import cloudinary from 'cloudinary';
+import { generateAccessToken, generateRefreshToken } from '../utils/generateTokens.js';
 import { notifyTeacherAdded } from '../services/rabbitmq.service.js';
+import { sendMail } from '../utils/sendMail.js';
 dotenv.config();
-// Generate tokens
-const generateAccessToken = (user) => {
-    return jwt.sign(
-        { 
-            id: user._id,
-            email: user.email,
-            role: user.role,
-            level : user.level,
-            username : user.username,
-        },
-        process.env.JWT_ACCESS_SECRET,
-        { expiresIn: '15m' }
-    );
-};
 
-const generateRefreshToken = (user) => {
-    return jwt.sign(
-        { id: user._id },
-        process.env.JWT_REFRESH_SECRET,
-        { expiresIn: '7d' }
-    );
-};
+// Configure Cloudinary (add this near the top of your file after imports)
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
 
 // Register new user
 export const register = async (req, res) => {
     try {
-        const { level,username, email, password, role = 'student' } = req.body;
+        const { username, email, password, role, level } = req.body;
         
         // Check if user already exists
-        const existingUser = await User.findOne({ $or : [{ username }, { email }] });
+        const existingUser = await User.findOne({ email });
+        
         if (existingUser) {
-            return res.status(400).json({ message: 'User already exists' });
+            return res.status(400).json({ message: 'Email already exists' });  
         }
         
-        // Hash password with bcrypt
+        // Hash password
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
+        
         // Create new user
         const newUser = new User({
             username,
             email,
             password: hashedPassword,
-            role,
-            level
+            role: role || 'student',
+            level,
+            isEmailVerified: false // Set to false initially
         });
         
         await newUser.save();
         
-        // Generate tokens
-        const accessToken = generateAccessToken(newUser);
-        const refreshToken = generateRefreshToken(newUser);
+        // Generate OTP
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
         
-        // Save refresh token to user
-        newUser.refreshToken = refreshToken;
+        // Update user with OTP
+        newUser.emailVerificationOTP = otp;
+        newUser.otpExpiresAt = otpExpiresAt;
         await newUser.save();
         
-        // Set refresh token as HttpOnly cookie
-        res.cookie('refreshToken', refreshToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+        // Send email asynchronously (don't await)
+        const emailContent = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #333; text-align: center;">Welcome! Verify Your Email</h2>
+            <p>Hello ${username},</p>
+            <p>Thank you for signing up! Please use the following OTP to verify your email address:</p>
+            <div style="background-color: #f4f4f4; padding: 20px; text-align: center; margin: 20px 0;">
+              <h1 style="color: #007bff; font-size: 32px; margin: 0; letter-spacing: 5px;">${otp}</h1>
+            </div>
+            <p>This OTP will expire in 10 minutes.</p>
+            <p>If you didn't create an account, please ignore this email.</p>
+            <hr style="margin: 30px 0;">
+            <p style="color: #666; font-size: 12px;">This is an automated email, please do not reply.</p>
+          </div>
+        `;
+        
+        // Fire and forget email sending
+        sendMail({
+            to: email,
+            subject: 'Email Verification',
+            html: emailContent
+        }).catch(error => {
+            console.error('Email sending failed:', error);
         });
         
-        // Send user data and access token
-        const userData = {
-            id: newUser._id,
-            username: newUser.username,
-            email: newUser.email,
-            role: newUser.role,
-            level : newUser.level,
-            avatar: newUser.avatar,
-        };
-        
+        // Send response ONCE (removed duplicate)
         res.status(201).json({
-            user: userData,
-            accessToken
+            message: 'Registration successful! Please check your email for OTP verification.',
+            user: {
+                id: newUser._id,
+                username: newUser.username,
+                email: newUser.email,
+                role: newUser.role,
+                isEmailVerified: false
+            },
+            requiresEmailVerification: true
         });
+        
     } catch (error) {
         console.error('Registration error:', error);
-        res.status(500).json({ message: 'Server error' });
+        res.status(500).json({ message: 'Registration failed' });
     }
 };
 
@@ -271,7 +279,6 @@ export const verify = async (req, res) => {
 export const googleAuth = (req, res) => {
     // Make sure the redirect URI is properly defined
     const redirectUri = process.env.GOOGLE_REDIRECT_URI;
-    console.log(redirectUri)
     if (!process.env.GOOGLE_CLIENT_ID || !redirectUri) {
         console.error('Google OAuth configuration missing:', { 
             clientId: !!process.env.GOOGLE_CLIENT_ID, 
@@ -282,7 +289,6 @@ export const googleAuth = (req, res) => {
     
     // Redirect to Google OAuth
     const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${redirectUri}&response_type=code&scope=profile email`;
-    console.log('Redirecting to Google OAuth URL:', googleAuthUrl);
     res.redirect(googleAuthUrl);
 };
 
@@ -311,7 +317,6 @@ export const googleCallback = async (req, res) => {
             }),
         });
         
-        // Rest of the function remains the same
         const tokenData = await tokenResponse.json();
         
         // Get user info
@@ -326,58 +331,72 @@ export const googleCallback = async (req, res) => {
         // Find or create user
         let user = await User.findOne({ email: userInfo.email });
         
-        if (!user) {
-            // Create new user with bcrypt hashed random password
-            const randomPassword = Math.random().toString(36).slice(-8);
-            const salt = await bcrypt.genSalt(10);
-            const hashedPassword = await bcrypt.hash(randomPassword, salt);
+        if (user) {
+            const accessToken = generateAccessToken(user);
+            const refreshToken = generateRefreshToken(user);
             
-            user = new User({
-                username: userInfo.name,
-                email: userInfo.email,
-                password: hashedPassword,
-                role: 'student',
-                googleId: userInfo.id,
+            // Set refresh token as HttpOnly cookie
+            res.cookie('refreshToken', refreshToken, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'strict',
+                maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
             });
-            
-            await user.save();
-        } else if (!user.googleId) {
-            // Link Google account to existing user
-            user.googleId = userInfo.id;
-            await user.save();
+            res.redirect(`${process.env.FRONTEND_URL}/auth/callback?token=${accessToken}&role=${user.role}&isNewUser=false`);
+        } else {
+            // New user - redirect to complete registration
+            res.redirect(`${process.env.FRONTEND_URL}/auth/callback?isNewUser=true&email=${encodeURIComponent(userInfo.email)}&name=${encodeURIComponent(userInfo.name)}&picture=${encodeURIComponent(userInfo.picture)}`);
         }
         
-        // Generate tokens
-        const accessToken = generateAccessToken(user);
-        const refreshToken = generateRefreshToken(user);
-        
-        // Save refresh token to user
-        user.refreshToken = refreshToken;
-        await user.save();
-        
-        // Set refresh token as HttpOnly cookie
-        res.cookie('refreshToken', refreshToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-        });
-        
-        // Redirect to frontend with access token and user role
-        res.redirect(`${process.env.FRONTEND_URL}/auth/callback?token=${accessToken}&role=${user.role}`);
     } catch (error) {
         console.error('Google callback error:', error);
         res.redirect(`${process.env.FRONTEND_URL}/login?error=google_auth_failed`);
     }
 };
-
-// Configure Cloudinary (add this near the top of your file after imports)
-cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET
-});
-
+export const completeGoogleRegistration = async (req, res) => {
+    try {
+         const { email, username, role,isGoogleUser,level,children } = req.body;
+         const salt = await bcrypt.genSalt(10);
+         const hashedPassword = await bcrypt.hash(Math.random().toString(36).slice(-8), salt);
+    
+         const userData = {
+             email,
+             username,
+             role: role ,
+             isGoogleUser,
+             level,
+             children,
+             password: hashedPassword
+         }
+         const user = new User(userData);
+         await user.save();
+         // Existing user - generate tokens and redirect
+         const accessToken = generateAccessToken(user);
+         const refreshToken = generateRefreshToken(user);
+         
+           // Set refresh token as HttpOnly cookie
+         res.cookie('refreshToken', refreshToken, {
+             httpOnly: true,
+             secure: process.env.NODE_ENV === 'production',
+             sameSite: 'strict',
+             maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+         });
+         res.status(201).json({
+             user: {
+                id: user._id,
+                username: user.username, // Changed from name to username to match your model
+                email: user.email,
+                role: user.role,
+                level : user.level,
+                avatar: user.avatar
+             },
+             accessToken
+         })
+    }catch(error){
+        console.error('Google registration error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+}
 // Update the updateProfile function
 export const updateProfile = async (req, res) => {
     try {
@@ -657,8 +676,7 @@ export const getTeacherBySubjectAndLevel = async (req, res) => {
 }
 export const getAnalytics = async (req, res) => {
     try {
-        // Check if user is admin
-        console.log("w")
+
         if (req.user.role !== 'admin') {
             return res.status(403).json({ message: 'Forbidden: Only admins can access analytics' });
         }
@@ -667,6 +685,7 @@ export const getAnalytics = async (req, res) => {
         const totalUsers = await User.countDocuments();
         const totalStudents = await User.countDocuments({ role: 'student' });
         const totalTeachers = await User.countDocuments({ role: 'teacher' });
+        const totalParents = await User.countDocuments({ role: 'parent' });
         const activeTeachers = await User.countDocuments({ role: 'teacher', status: 'Active' });
         
         // Get class distribution (for students) grouped into three categories
@@ -754,13 +773,14 @@ export const getAnalytics = async (req, res) => {
         registrationTrends.forEach(item => {
             const monthName = months[item.month - 1];
             const formattedMonth = `${monthName} ${item.year}`;
-            
             const existingMonth = formattedTrends.find(m => m.name === formattedMonth);
             if (existingMonth) {
                 if (item.role === 'student') {
                     existingMonth.students = item.count;
                 } else if (item.role === 'teacher') {
                     existingMonth.teachers = item.count;
+                }else if (item.role === 'parent') {
+                    existingMonth.parents = item.count;
                 }
                 existingMonth.total += item.count;
             }
@@ -798,6 +818,7 @@ export const getAnalytics = async (req, res) => {
                 totalUsers,
                 totalStudents,
                 totalTeachers,
+                totalParents,
                 activeTeachers,
                 studentPercentage: Math.round((totalStudents / totalUsers) * 100),
                 teacherPercentage: Math.round((totalTeachers / totalUsers) * 100)
@@ -908,12 +929,45 @@ export const addChild = async (req, res) => {
         if (!child) {
             return res.status(404).json({ message: 'Child not found' });
         }
+        if(user.children.includes(childId)){
+            return res.status(400).json({ message: 'Child already added' });
+        }
         user.children.push(childId);
         await user.save();
-        res.status(200).json({ message: 'Child added successfully',child});
+        const childData =  {
+            id: user._id,
+            username: user.username,
+            email: user.email,
+            role: user.role,
+            level : user.level,
+            avatar: user.avatar,
+        }
+        res.status(200).json({ message: 'Child added successfully',childData});
 
     } catch(err){
         console.error('Add child error:', err);
         res.status(500).json({ message: 'Server error' });
     }
+}
+
+export const deleteChild = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const childId = req.params.id;
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        const childIndex = user.children.indexOf(childId);
+        if (childIndex === -1) {
+            return res.status(404).json({ message: 'Child not found' });
+        }
+        user.children.splice(childIndex, 1);
+        await user.save();
+        res.status(200).json({ message: 'Child deleted successfully' });
+    }catch (error) {
+        console.error('Delete child error:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+    
 }

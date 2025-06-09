@@ -318,6 +318,7 @@ export const trackActivity = async (req, res) => {
   }
 };
 
+
 // Get user progress for a specific course
 export const getUserCourseProgress = async (req, res) => {
   try {
@@ -397,7 +398,7 @@ export const getUserDashboardAnalytics = async (req, res) => {
     
     // Calculate performance metrics
     const performanceMetrics = await calculatePerformanceMetrics(userId);
-    
+    console.log(performanceMetrics)
     // Calculate recent progress trend (last 7 days)
     const progressTrend = await calculateProgressTrend(userId);
     
@@ -578,20 +579,19 @@ async function calculatePerformanceMetrics(userId) {
     userId,
     activityType: { $in: ['exercise_attempt', 'exercise_complete'] }
   });
-  
+  console.log("exerciseActivities",exerciseActivities)
   // Calculate exercise completion rate
-  const exerciseAttempts = exerciseActivities.filter(a => a.activityType === 'exercise_attempt').length;
   const exerciseCompletions = exerciseActivities.filter(a => a.activityType === 'exercise_complete').length;
   
-  const exerciseCompletionRate = exerciseAttempts > 0
-    ? Math.round((exerciseCompletions / exerciseAttempts) * 100)
+  const exerciseCompletionRate = exerciseActivities.length > 0
+    ? Math.round((exerciseCompletions / exerciseActivities.length) * 100)
     : 0;
   
   return {
     averageQuizScore: Math.round(averageQuizScore),
     exerciseCompletionRate,
     totalQuizAttempts: quizActivities.length,
-    totalExerciseAttempts: exerciseAttempts
+    totalExerciseAttempts: exerciseActivities.length
   };
 }
 
@@ -768,10 +768,12 @@ export const getExerciseActivity = async (req, res) => {
   try {
     const userId = req.user.id;
     const { lessonId } = req.params; 
+    const {activityType} = req.query;
+    const query = activityType ? [activityType] : ['exercise_complete', 'exercise_attempt'];
     const activities = await Activity.find({ 
       userId, 
       lessonId, 
-      activityType: { $in: ['exercise_complete', 'exercise_attempt'] } 
+      activityType: { $in: query } 
     });
     if (!activities) {
       return res.status(404).json({ message: 'No exercise activity found' });

@@ -14,9 +14,11 @@ const tokenSchema = new Schema({
     createdAt: {
         type: Date,
         default: Date.now,
-        expires: 3600,
     },
 });
+
+// Add TTL index to automatically delete documents after 1 hour (3600 seconds)
+tokenSchema.index({ createdAt: 1 }, { expireAfterSeconds: 600 });
 
 const token = mongoose.model("token", tokenSchema);
 export default token;
