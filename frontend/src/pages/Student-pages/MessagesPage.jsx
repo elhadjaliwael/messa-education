@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import React, { useState, useEffect, useMemo } from 'react'
 import MessagesContactSideBar from "./MessagesContactSideBar"
 import MessagesChatArea from "./MessagesChatArea"
 import useMessageStore from "@/store/messageStore"
@@ -7,12 +7,10 @@ import { axiosPrivate } from "@/api/axios"
 import { classes } from "@/data/tunisian-education"
 
 export default function MessagesPage() {
-  const { auth } = useAuth() // Get current user from auth context
-  const [searchTerm, setSearchTerm] = useState("")
-  const [activeTab, setActiveTab] = useState("all")
-  const [showMobileSidebar, setShowMobileSidebar] = useState(false)
+  const { auth } = useAuth()
   const [isMobile, setIsMobile] = useState(false)
- // Get state and actions from Zustand store
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false)
+  
   const { 
     contacts, 
     setContacts,
@@ -20,7 +18,18 @@ export default function MessagesPage() {
     sendMessage,
     getMessagesForSelectedContact
   } = useMessageStore()
-  // Initialize socket connection
+
+  // Simplified mobile detection - only for actual mobile devices
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
   useEffect(() => {
     if (auth) {
       
@@ -133,61 +142,23 @@ export default function MessagesPage() {
     }
     
   }, [auth, setContacts]);
-  
-  // Check if we're on mobile based on window width
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    // Initial check
-    checkMobile();
-    
-    // Add event listener for window resize
-    window.addEventListener('resize', checkMobile);
-    
-    // Cleanup
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  // Filter contacts based on search and active tab
-  const [filteredContacts, setFilteredContacts] = useState([]);
-  
-  useEffect(() => {
-    let filtered = [...contacts];
-    
-    if (activeTab === "unread") {
-      filtered = filtered.filter(contact => contact.unread);
-    } else if (activeTab === "online") {
-      filtered = filtered.filter(contact => contact.online);
-    }
-    
-    // Apply search filter if there's a search term
-    if (searchTerm) {
-      filtered = filtered.filter(contact => 
-        contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        contact.subject.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-    
-    setFilteredContacts(filtered);
-  }, [contacts, activeTab, searchTerm]);
 
   const toggleSidebar = () => {
-    setShowMobileSidebar(!showMobileSidebar);
-  };
+    setShowMobileSidebar(!showMobileSidebar)
+  }
   
-  // Get messages for the selected contact
-  const messages = getMessagesForSelectedContact();
+  const messages = getMessagesForSelectedContact()
 
   return (
-    <div className="h-screen flex flex-col">
-      <div className="flex justify-between items-center mb-6">
+    <div className="h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
+      {/* Header */}
+      <div className="flex-shrink-0 p-6 bg-white dark:bg-slate-950 border-b dark:border-slate-800">
         <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50">Messages</h1>
       </div>
 
-      <div className="flex flex-1 rounded-lg border bg-white dark:border-slate-800 dark:bg-slate-950 relative overflow-hidden">
-        {/* Mobile sidebar overlay */}
+      {/* Main Content */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Mobile Overlay */}
         {isMobile && showMobileSidebar && (
           <div 
             className="fixed inset-0 bg-black/50 z-40"
@@ -195,12 +166,14 @@ export default function MessagesPage() {
           />
         )}
         
-        {/* Contact sidebar - hidden on mobile unless toggled */}
+        {/* Sidebar */}
         <div className={`
-          ${isMobile ? 'fixed inset-y-0 left-0 z-50 w-4/5 max-w-sm' : 'w-80 md:w-96'} 
-          ${isMobile && !showMobileSidebar ? 'translate-x-[-100%]' : 'translate-x-0'}
-          transition-transform duration-300 ease-in-out
-          bg-white dark:bg-slate-950 border-r dark:border-slate-800 h-full
+          ${isMobile 
+            ? 'fixed inset-y-0 left-0 z-50 w-80 transform transition-transform duration-300' 
+            : 'w-80 flex-shrink-0'
+          }
+          ${isMobile && !showMobileSidebar ? '-translate-x-full' : 'translate-x-0'}
+          bg-white dark:bg-slate-950 border-r dark:border-slate-800
         `}>
           <MessagesContactSideBar
             isMobile={isMobile}
@@ -208,8 +181,8 @@ export default function MessagesPage() {
           />
         </div>
 
-        {/* Chat area - full width on mobile */}
-        <div className="flex-1 h-full">
+        {/* Chat Area */}
+        <div className="flex-1 flex flex-col min-w-0">
           <MessagesChatArea
             selectedContact={selectedContact}
             messages={messages}

@@ -91,7 +91,7 @@ function ParentSignUpForm() {
       setErrors(newErrors);
       return;
     }
-
+    console.log(formData)
     try {
       const res = await axiosPrivate.post('/auth/register-parent', formData, {
         headers: {
@@ -99,7 +99,7 @@ function ParentSignUpForm() {
         },
         withCredentials: true
       });
-
+      console.log(formData)
       if (res.status === 201) {
         toast.success('Registration successful!');
         let redirectPath;
@@ -142,6 +142,7 @@ function ParentSignUpForm() {
         setPasswordStrength(0);
       }
     } catch (error) {
+      console.log(error)
       toast.error(error.response?.data?.message || 'Signup failed');
     }
   }

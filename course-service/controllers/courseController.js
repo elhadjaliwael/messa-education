@@ -11,6 +11,7 @@ export const createChapter = async (req, res) => {
     const addedByName = req.user.role === "teacher" ? req.user.name : "Admin"
     req.body.addedById = addedById;
     req.body.addedByName = addedByName;
+    
     const chapter = new Chapter(req.body);
     await chapter.save();
     try {
@@ -185,12 +186,12 @@ export const createLesson = async (req, res) => {
     });
     console.log(lesson)
     await lesson.save();
-    
     // Update chapter counts
     await chapter.save();
     
     res.status(201).json({message: 'Lesson created successfully', lessonId: lesson._id});
   } catch (error) {
+    console.log(error.message) // Log the error message to the conso
     res.status(400).json({ error: error.message });
   }
 }

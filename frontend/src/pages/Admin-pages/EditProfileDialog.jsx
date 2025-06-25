@@ -19,9 +19,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { classes } from '@/data/tunisian-education';
+import { classes,allSubjects } from '@/data/tunisian-education';
 
-function EditProfileDialog({isEditModalOpen,setIsEditModalOpen,editingTeacher,setEditingTeacher,handleEditSubmit,handleEditInputChange,handleStatusChange}) {
+function EditProfileDialog({isEditModalOpen,setIsEditModalOpen,editingTeacher,handleEditSubmit,handleEditInputChange,handleStatusChange}) {
   return (
     <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
     <DialogContent className="sm:max-w-[550px]">
@@ -82,21 +82,23 @@ function EditProfileDialog({isEditModalOpen,setIsEditModalOpen,editingTeacher,se
               <Select 
                 name="subject" 
                 value={editingTeacher.subject}
-                onValueChange={(value) => setEditingTeacher(prev => ({ ...prev, subject: value }))}
+                onValueChange={(value) => {
+                  const event = {
+                    target: {
+                      name: 'subject',
+                      value: value
+                    }
+                  };
+                  handleEditInputChange(event);
+                }}
               >
                 <SelectTrigger className="col-span-3">
                   <SelectValue placeholder="Select a subject" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Mathematics">Mathematics</SelectItem>
-                  <SelectItem value="Physics">Physics</SelectItem>
-                  <SelectItem value="Chemistry">Chemistry</SelectItem>
-                  <SelectItem value="Biology">Biology</SelectItem>
-                  <SelectItem value="French">French</SelectItem>
-                  <SelectItem value="English">English</SelectItem>
-                  <SelectItem value="Arabic">Arabic</SelectItem>
-                  <SelectItem value="History">History</SelectItem>
-                  <SelectItem value="Geography">Geography</SelectItem>
+                  {allSubjects.map(subject => (
+                     <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

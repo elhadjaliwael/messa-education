@@ -252,7 +252,7 @@ const useMessageStore = create((set, get) => ({
   
   // Upload attachment and send message with attachment
   // Updated uploadAttachment function for direct Cloudinary upload
-  uploadAttachment: async (file, type = 'file', onProgress = null) => {
+  uploadAttachment: async (file, type = 'file', onProgress = null, content = '') => {
     const { socket, selectedContact, sendMessage } = get();
     
     if (!socket || !selectedContact) {
@@ -285,9 +285,8 @@ const useMessageStore = create((set, get) => ({
         ...(uploadResult.height && { height: uploadResult.height })
       };
       
-      // Send message with attachment
-      const content = type === 'image' ? 'Image' : 'Fichier';
-      const message = sendMessage(content, type, attachment);
+      // Send message with attachment and text content
+      const message = sendMessage(content || '', type, attachment);
       
       return { message, attachment };
     } catch (error) {

@@ -21,7 +21,7 @@ function QuizzesForm({
       passingScore: 70,
       questions: []
     };
-    
+    console.log('new quiz',newQuiz)
     updateCurrentLesson({
       quizzes: [...(currentLesson.quizzes || []), newQuiz]
     });

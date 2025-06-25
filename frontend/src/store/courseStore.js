@@ -172,7 +172,6 @@ const useCourseStore = create((set) => ({
       _id: uuidv4(),
       ...state.currentLesson
     };
-    
     const updatedChapters = state.courseData.chapters.map(chapter => {
       if (chapter._id === chapterId) {
         return {
@@ -182,7 +181,6 @@ const useCourseStore = create((set) => ({
       }
       return chapter;
     });
-    
     return {
       courseData: {
         ...state.courseData,

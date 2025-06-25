@@ -73,7 +73,13 @@ function AddCourse() {
             isNew : true,
             cloudinaryPublicId: lesson.cloudinaryPublicId,
             exercises: (lesson.exercises || []).map(({ _id, ...exercise }) => exercise),
-            quizzes: (lesson.quizzes || []).map(({ _id, ...quiz }) => quiz),
+            quizzes: (lesson.quizzes || []).map(({ _id, ...quiz }) => ({
+              ...quiz,
+              questions: (quiz.questions || []).map(({ _id, ...question }) => ({
+                ...question,
+                options: (question.options || []).map(({ _id, ...option }) => option)
+              }))
+            })),
             resources: (lesson.resources || []).map(({ _id, ...resource }) => resource)
           });
         }

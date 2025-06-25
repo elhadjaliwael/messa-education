@@ -41,7 +41,7 @@ import {
 import { Check, ChevronsUpDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { classes } from '@/data/tunisian-education';
+import { classes,allSubjects } from '@/data/tunisian-education';
 function AdminUsersPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newTeacher, setNewTeacher] = useState({
@@ -144,7 +144,6 @@ function AdminUsersPage() {
 
   // Add available classes for selection
   const availableClasses = Object.keys(classes);
-console.log(availableClasses)
   // Replace the handleClassToggle function with this
   const handleClassSelect = (className) => {
     setNewTeacher(prev => {
@@ -267,15 +266,9 @@ console.log(availableClasses)
                         <SelectValue placeholder="Select a subject" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Mathematics">Mathematics</SelectItem>
-                        <SelectItem value="Physics">Physics</SelectItem>
-                        <SelectItem value="Chemistry">Chemistry</SelectItem>
-                        <SelectItem value="Biology">Biology</SelectItem>
-                        <SelectItem value="French">French</SelectItem>
-                        <SelectItem value="English">English</SelectItem>
-                        <SelectItem value="Arabic">Arabic</SelectItem>
-                        <SelectItem value="History">History</SelectItem>
-                        <SelectItem value="Geography">Geography</SelectItem>
+                        {allSubjects.map(subject => (
+                          <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     {errors.subject && (

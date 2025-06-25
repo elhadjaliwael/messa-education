@@ -161,6 +161,7 @@ function TeachersTable() {
     e.preventDefault();
     try {
       const response = await axiosPrivate.put(`/auth/teachers/${editingTeacher.id}`, editingTeacher);
+      console.log(response)
       toast.success('Teacher updated successfully!');
       setIsEditModalOpen(false);
       
@@ -173,6 +174,7 @@ function TeachersTable() {
   
   // Add this function to handle input changes
   const handleEditInputChange = (e) => {
+    console.log(e)
     const { name, value } = e.target;
     setEditingTeacher(prev => ({
       ...prev,

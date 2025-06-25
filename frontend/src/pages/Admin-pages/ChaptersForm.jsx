@@ -1,4 +1,4 @@
-import React from 'react';
+import React,{useEffect} from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,15 +7,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { ChevronLeft, ChevronRight, Plus, Trash2 } from "lucide-react";
 import useCourseStore from '@/store/courseStore';
 import toast from 'react-hot-toast';
+import { axiosPrivate } from '@/api/axios';
 
 function ChaptersForm({ prevStep, nextStep }) {
   // Get state and actions from the store
   const courseData = useCourseStore(state => state.courseData);
   const currentChapter = useCourseStore(state => state.currentChapter);
   const updateCurrentChapter = useCourseStore(state => state.updateCurrentChapter);
+  const updateCourseData = useCourseStore(state => state.updateCourseData);
   const addChapter = useCourseStore(state => state.addChapter);
   const removeChapter = useCourseStore(state => state.removeChapter);
-  
   // Handle chapter changes
   const handleChapterChange = (e) => {
     const { name, value } = e.target;

@@ -613,7 +613,8 @@ export const deleteTeacher = async (req, res) => {
 export const updateTeacher = async (req, res) => {
     try {
         const userId = req.params.id;
-        const { username, email, level, emailNofification, role, classes, status } = req.body;
+        console.log(req.body)
+        const { username, email, subject, emailNofification, role, classes, status } = req.body;
         const user = await User.findById(userId); 
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
@@ -621,7 +622,7 @@ export const updateTeacher = async (req, res) => {
         // Update user fields
         user.username = username || user.username;
         user.email = email || user.email;
-        user.level = level || user.level;
+        user.subject = subject || user.subject;
         user.emailNofification = emailNofification || user.emailNofification;
         user.role = role || user.role;
         user.classes = classes || user.classes;
@@ -843,7 +844,7 @@ export const registerParent = async (req, res) => {
         const { username, email, password, childrenIds = [] } = req.body;
         // Filter out empty or invalid child IDs
         const filteredChildrenIds = (childrenIds || []).filter(id => id && id.trim() !== '');
-
+        console.log(req.body)
         // Check if user already exists
         const existingUser = await User.findOne({ $or: [{ username }, { email }] });
         if (existingUser) {

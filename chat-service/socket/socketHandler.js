@@ -95,9 +95,8 @@ export default function setupSocket(io) {
     // Handle sending group messages
     socket.on('send_group_message', async (message) => {
       try {
-        const { senderId, groupId, content, timestamp } = message;
-        
-        
+        const { senderId, groupId, content, timestamp,attachment} = message;
+        console.log(attachment)
         // Save message to database with sender role
         const newMessage = new Message({
           senderId,
@@ -105,6 +104,7 @@ export default function setupSocket(io) {
           content,
           timestamp,
           isGroupMessage: true,
+          attachment,
           read: false,
           senderRole: socket.role // Add the sender's role from socket
         });
@@ -119,6 +119,7 @@ export default function setupSocket(io) {
           content,
           timestamp,
           isGroupMessage: true,
+          attachment,
           read: false,
           senderRole: socket.role // Include sender role in the message sent to clients
         };
